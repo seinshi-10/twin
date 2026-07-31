@@ -179,7 +179,10 @@
     let isCamOn = true;
     let recognition = null;
     let isCallActive = false;
-    let activeUtterance = null; // Fixes Chrome garbage collection bug for speech output
+    let activeUtterance = null;
+    
+    // Global conversation history array to remember all past messages
+    let chatHistory = [];
 
     function goToScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -214,15 +217,24 @@
       }
     }
 
-    async function askAI(text) {
+    // Sends the full conversation history to the Cloudflare Worker proxy
+    async function askAI(userText) {
+      // Append user message to history
+      chatHistory.push({ role: "user", content: userText });
+
       try {
         const response = await fetch("https://twin-proxy.tazabaevmaman07.workers.dev", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, language: currentLang })
+          body: JSON.stringify({ messages: chatHistory, language: currentLang })
         });
         const data = await response.json();
-        return data.reply || "Yeah, totally.";
+        const botReply = data.reply || "Yeah, totally.";
+
+        // Append assistant response to history
+        chatHistory.push({ role: "assistant", content: botReply });
+
+        return botReply;
       } catch (error) {
         console.error("AI connection error:", error);
         return "Connection hiccup.";
