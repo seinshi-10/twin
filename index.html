@@ -11,318 +11,86 @@
       --surface-border: #27272a;
       --primary: #ffffff;
       --accent: #3b82f6;
-      --accent-glow: rgba(59, 130, 246, 0.4);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --danger: #ef4444;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #000000; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--text-main); }
+    .app-frame { width: 100%; max-width: 410px; height: 820px; background-color: var(--bg-color); border-radius: 44px; border: 8px solid #1f1f22; overflow: hidden; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.9); display: flex; flex-direction: column; }
+    .screen { display: none; flex-direction: column; height: 100%; width: 100%; padding: 24px 20px; animation: fadeIn 0.3s ease; overflow-y: auto; }
+    .screen.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-    body {
-      background-color: #000000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      color: var(--text-main);
-    }
-
-    .app-frame {
-      width: 100%;
-      max-width: 410px;
-      height: 820px;
-      background-color: var(--bg-color);
-      border-radius: 44px;
-      border: 8px solid #1f1f22;
-      overflow: hidden;
-      position: relative;
-      box-shadow: 0 0 60px rgba(0,0,0,0.9);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .screen {
-      display: none;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      padding: 24px 20px;
-      animation: fadeIn 0.3s ease;
-      overflow-y: auto;
-    }
-
-    .screen.active {
-      display: flex;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    h1, h2, h3 { font-weight: 700; letter-spacing: -0.5px; }
+    h2, h3 { font-weight: 700; letter-spacing: -0.5px; }
     p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4; }
 
-    /* Form Fields & Controls */
-    .field-group {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: -4px;
-    }
-
-    input, textarea, select {
-      width: 100%;
-      background: var(--surface-color);
-      border: 1px solid var(--surface-border);
-      color: var(--text-main);
-      padding: 14px 16px;
-      border-radius: 14px;
-      font-size: 0.95rem;
-      outline: none;
-    }
-
+    .field-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    label { font-size: 0.85rem; color: var(--text-muted); }
+    input, textarea, select { width: 100%; background: var(--surface-color); border: 1px solid var(--surface-border); color: var(--text-main); padding: 14px 16px; border-radius: 14px; font-size: 0.95rem; outline: none; }
     input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
-    button.btn-primary {
-      width: 100%;
-      background: var(--primary);
-      color: #000000;
-      border: none;
-      padding: 16px;
-      border-radius: 14px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: auto;
-      transition: opacity 0.2s;
-    }
+    button.btn-primary { width: 100%; background: var(--primary); color: #000000; border: none; padding: 16px; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: auto; transition: opacity 0.2s; }
     button.btn-primary:hover { opacity: 0.95; }
 
-    /* Top Navigation Header */
-    .top-nav {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 15px;
-    }
+    .top-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+    .btn-icon { background: var(--surface-color); border: 1px solid var(--surface-border); color: var(--text-main); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .header-actions { display: flex; gap: 8px; }
 
-    .btn-icon {
-      background: var(--surface-color);
-      border: 1px solid var(--surface-border);
-      color: var(--text-main);
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-    }
+    .twin-viewport-container { flex: 1; background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 80%); border-radius: 28px; border: 1px solid var(--surface-border); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.8); }
+    
+    .avatar-3d-stage { width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #60a5fa, #3b82f6 40%, #1d4ed8 70%, #0f172a 100%); background-size: cover; background-position: center; box-shadow: 0 0 50px rgba(59, 130, 246, 0.5), inset -10px -10px 30px rgba(0,0,0,0.6); position: relative; animation: idleFloat 4s ease-in-out infinite; }
+    .avatar-3d-stage.talking { animation: talkGlow 0.5s infinite alternate ease-in-out; }
 
-    .header-actions {
-      display: flex;
-      gap: 8px;
-    }
+    @keyframes idleFloat { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.02); } }
+    @keyframes talkGlow { from { transform: scale(1); box-shadow: 0 0 40px rgba(59, 130, 246, 0.4); } to { transform: scale(1.08); box-shadow: 0 0 80px rgba(236, 72, 153, 0.8); } }
 
-    /* Main Hub 3D Stage */
-    .twin-viewport-container {
-      flex: 1;
-      background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 80%);
-      border-radius: 28px;
-      border: 1px solid var(--surface-border);
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      overflow: hidden;
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
-    }
-
-    .avatar-3d-stage {
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #60a5fa, #3b82f6 40%, #1d4ed8 70%, #0f172a 100%);
-      box-shadow: 0 0 50px rgba(59, 130, 246, 0.5), inset -10px -10px 30px rgba(0,0,0,0.6);
-      position: relative;
-      animation: idleFloat 4s ease-in-out infinite;
-    }
-
-    .avatar-3d-stage.talking {
-      animation: talkGlow 0.5s infinite alternate ease-in-out;
-    }
-
-    @keyframes idleFloat {
-      0%, 100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-10px) scale(1.02); }
-    }
-
-    @keyframes talkGlow {
-      from { transform: scale(1); box-shadow: 0 0 40px rgba(59, 130, 246, 0.4); }
-      to { transform: scale(1.08); box-shadow: 0 0 80px rgba(236, 72, 153, 0.8); }
-    }
-
-    .avatar-dialogue-bubble {
-      position: absolute;
-      bottom: 15px;
-      left: 15px;
-      right: 15px;
-      background: rgba(24, 24, 27, 0.85);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--surface-border);
-      padding: 12px 16px;
-      border-radius: 16px;
-      font-size: 0.85rem;
-      text-align: center;
-      color: var(--text-main);
-    }
-
-    .main-actions-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .action-card {
-      background: var(--surface-color);
-      border: 1px solid var(--surface-border);
-      padding: 18px;
-      border-radius: 20px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: border-color 0.2s;
-    }
+    .avatar-dialogue-bubble { position: absolute; bottom: 15px; left: 15px; right: 15px; background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(10px); border: 1px solid var(--surface-border); padding: 12px 16px; border-radius: 16px; font-size: 0.85rem; text-align: center; color: var(--text-main); }
+    .main-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .action-card { background: var(--surface-color); border: 1px solid var(--surface-border); padding: 18px; border-radius: 20px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s; }
     .action-card:hover { border-color: var(--accent); }
 
-    /* Call UI with Camera Feed & Action Controls */
-    .user-self-video {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      width: 90px;
-      height: 120px;
-      background: #000;
-      border-radius: 14px;
-      border: 2px solid var(--surface-border);
-      object-fit: cover;
-      transform: scaleX(-1);
-    }
+    .user-self-video { position: absolute; top: 15px; right: 15px; width: 90px; height: 120px; background: #000; border-radius: 14px; border: 2px solid var(--surface-border); object-fit: cover; transform: scaleX(-1); }
+    .call-controls-bar { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+    .call-btn { width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--surface-border); background: var(--surface-color); color: var(--text-main); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .call-btn.off { background: rgba(239, 68, 68, 0.2); border-color: var(--danger); color: var(--danger); }
+    .call-btn.hangup { background: var(--danger); color: #fff; border: none; }
 
-    .call-controls-bar {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 15px;
-    }
-
-    .call-btn {
-      width: 54px;
-      height: 54px;
-      border-radius: 50%;
-      border: 1px solid var(--surface-border);
-      background: var(--surface-color);
-      color: var(--text-main);
-      font-size: 1.2rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-    }
-
-    .call-btn.off {
-      background: rgba(239, 68, 68, 0.2);
-      border-color: var(--danger);
-      color: var(--danger);
-    }
-
-    .call-btn.hangup {
-      background: var(--danger);
-      color: #fff;
-      border: none;
-    }
-
-    /* Chat UI */
-    .chat-area {
-      flex: 1;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .msg {
-      max-width: 82%;
-      padding: 12px 16px;
-      border-radius: 18px;
-      font-size: 0.92rem;
-      line-height: 1.45;
-    }
+    .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 82%; padding: 12px 16px; border-radius: 18px; font-size: 0.92rem; line-height: 1.45; }
     .msg.bot { background: var(--surface-color); border: 1px solid var(--surface-border); align-self: flex-start; }
     .msg.user { background: var(--accent); color: #fff; align-self: flex-end; }
-
     .chat-input-bar { display: flex; gap: 10px; margin-top: 15px; }
     .chat-input-bar input { margin-bottom: 0; }
-
-    .code-box {
-      background: var(--surface-color);
-      border: 1px dashed var(--accent);
-      padding: 25px;
-      border-radius: 20px;
-      text-align: center;
-      margin: 20px 0;
-    }
-    .code-display { font-size: 2rem; font-weight: 800; letter-spacing: 6px; color: var(--accent); margin-top: 8px; }
   </style>
 </head>
 <body>
 
   <div class="app-frame">
     
-    <!-- STEP 1: Registration Screen -->
+    <!-- STEP 1: Registration -->
     <div id="screen-auth" class="screen active">
       <h2 style="margin-top: 20px;">Create your Twin</h2>
       <p>Set up your account to generate your AI companion.</p>
-      
       <div class="field-group">
         <input type="text" placeholder="First Name">
         <input type="text" placeholder="Last Name">
         <input type="text" placeholder="Username">
         <input type="password" placeholder="Password">
       </div>
-      
       <button class="btn-primary" onclick="goToScreen('screen-setup')">Continue to AI Creator</button>
     </div>
 
-    <!-- STEP 2: 3D Look Setup -->
+    <!-- STEP 2: Twin Appearance Setup -->
     <div id="screen-setup" class="screen">
       <h2 style="margin-top: 20px;">Design Twin's Appearance</h2>
-      <p>Describe your companion's style, vibe, and features for the 3D model engine.</p>
-      
-      <textarea rows="5" placeholder="e.g. A realistic companion with short dark hair, wearing a stylish jacket..."></textarea>
-      
-      <button class="btn-primary" onclick="goToScreen('screen-main')">Generate & Open Main Menu</button>
+      <p>Describe your companion's style, vibe, and features. The visual model will instantly generate based on this text.</p>
+      <textarea id="twinDescInput" rows="5" placeholder="e.g. A friendly young man with dark messy hair, wearing a black jacket, studio lighting..."></textarea>
+      <button class="btn-primary" onclick="generateTwinVisual()">Generate Visual & Open Hub</button>
     </div>
 
-    <!-- STEP 3: MAIN MENU (3D AVATAR HUB) -->
+    <!-- STEP 3: MAIN MENU -->
     <div id="screen-main" class="screen">
       <div class="top-nav" style="justify-content: space-between;">
         <div>
@@ -330,27 +98,23 @@
           <span style="font-size: 0.75rem; color: #10b981;">● Active Companion</span>
         </div>
         <div class="header-actions">
-          <button class="btn-icon" title="Sync Team Code" onclick="goToScreen('screen-connect')">🤝</button>
           <button class="btn-icon" title="Settings" onclick="goToScreen('screen-settings')">⚙️</button>
         </div>
       </div>
 
-      <!-- Center 3D Model Display -->
       <div class="twin-viewport-container">
         <div class="avatar-3d-stage" id="mainAvatar3D"></div>
         <div class="avatar-dialogue-bubble" id="avatarSpeech">
-          "Hello! I'm Twin. English is my default language!"
+          "Hey! What's up?"
         </div>
       </div>
 
-      <!-- Quick Action Grid -->
       <div class="main-actions-grid">
         <div class="action-card" onclick="goToScreen('screen-chat')">
           <span style="font-size: 1.5rem;">💬</span>
           <span style="font-size: 0.95rem; font-weight: 700;">Text Chat</span>
           <span style="font-size: 0.75rem; color: var(--text-muted);">Chat with Twin</span>
         </div>
-
         <div class="action-card" onclick="startCall()">
           <span style="font-size: 1.5rem;">📞</span>
           <span style="font-size: 0.95rem; font-weight: 700;">Interactive Call</span>
@@ -359,22 +123,20 @@
       </div>
     </div>
 
-    <!-- STEP 4: Settings Menu -->
+    <!-- STEP 4: Settings -->
     <div id="screen-settings" class="screen">
       <div class="top-nav">
         <button class="btn-icon" onclick="goToScreen('screen-main')">←</button>
         <h3>Settings</h3>
       </div>
-
       <div class="field-group">
-        <label for="languageSelect">Twin Primary Language:</label>
+        <label for="languageSelect">Twin Language Mode:</label>
         <select id="languageSelect" onchange="updateLanguage()">
           <option value="en" selected>English (Default)</option>
           <option value="ru">Русский (Russian)</option>
           <option value="uz">O'zbekcha (Uzbek)</option>
         </select>
       </div>
-
       <button class="btn-primary" onclick="goToScreen('screen-main')">Save & Return</button>
     </div>
 
@@ -384,54 +146,30 @@
         <button class="btn-icon" onclick="goToScreen('screen-main')">←</button>
         <h3>Chat with Twin</h3>
       </div>
-      
       <div class="chat-area" id="chat-stream">
-        <div class="msg bot" id="chatGreeting">Hello! I'm ready to talk.</div>
+        <div class="msg bot" id="chatGreeting">Hey! What's up?</div>
       </div>
-
       <div class="chat-input-bar">
-        <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="handleKey(event)">
+        <input type="text" id="chat-input" placeholder="Say something..." onkeypress="handleKey(event)">
         <button class="btn-primary" style="margin-top:0; width:auto; padding:0 20px;" onclick="sendMsg()">Send</button>
       </div>
     </div>
 
-    <!-- STEP 6: Call Screen (With Mic & Camera Toggle Controls) -->
+    <!-- STEP 6: Call Screen -->
     <div id="screen-call" class="screen">
       <div class="top-nav">
         <button class="btn-icon" onclick="endCall()">←</button>
-        <h3 id="call-status">Connecting Call...</h3>
+        <h3 id="call-status">Connected...</h3>
       </div>
-
       <div class="twin-viewport-container" style="flex:1;">
         <div class="avatar-3d-stage talking" id="callAvatar3D"></div>
         <video id="userCamFeed" class="user-self-video" autoplay playsinline muted></video>
       </div>
-
-      <!-- Action buttons for Mic and Camera -->
       <div class="call-controls-bar">
-        <button class="call-btn" id="btnToggleMic" title="Toggle Mic" onclick="toggleMic()">🎤</button>
-        <button class="call-btn" id="btnToggleCam" title="Toggle Camera" onclick="toggleCam()">📹</button>
-        <button class="call-btn hangup" title="End Call" onclick="endCall()">☎</button>
+        <button class="call-btn" id="btnToggleMic" onclick="toggleMic()">🎤</button>
+        <button class="call-btn" id="btnToggleCam" onclick="toggleCam()">📹</button>
+        <button class="call-btn hangup" onclick="endCall()">☎</button>
       </div>
-    </div>
-
-    <!-- STEP 7: Team Code Screen -->
-    <div id="screen-connect" class="screen">
-      <div class="top-nav">
-        <button class="btn-icon" onclick="goToScreen('screen-main')">←</button>
-        <h3>Sync Nearby Twins</h3>
-      </div>
-      
-      <div class="code-box">
-        <p style="margin-bottom:0;">Your Team Code:</p>
-        <div class="code-display">TWIN-784</div>
-      </div>
-
-      <div class="field-group">
-        <input type="text" id="friend-code" placeholder="Enter Friend's Team Code">
-      </div>
-
-      <button class="btn-primary" onclick="alert('Twins linked successfully!'); goToScreen('screen-main');">Link Twins</button>
     </div>
 
   </div>
@@ -447,25 +185,36 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Settings Language Change
+    // Generate visual portrait based on the user's description in Step 2
+    function generateTwinVisual() {
+      const desc = document.getElementById('twinDescInput').value.trim() || "A realistic human companion portrait";
+      const prompt = encodeURIComponent(desc + ", high quality avatar, digital portrait, detailed lighting");
+      const imageUrl = `https://image.pollinations.ai/prompt/${prompt}`;
+
+      // Apply the generated visual to both the main hub stage and call stage
+      document.getElementById('mainAvatar3D').style.backgroundImage = `url('${imageUrl}')`;
+      document.getElementById('callAvatar3D').style.backgroundImage = `url('${imageUrl}')`;
+
+      goToScreen('screen-main');
+    }
+
     function updateLanguage() {
       currentLang = document.getElementById('languageSelect').value;
       const speech = document.getElementById('avatarSpeech');
       const greeting = document.getElementById('chatGreeting');
 
       if (currentLang === 'ru') {
-        speech.textContent = '"Привет! Я Твин. Мой основной язык - русский!"';
-        greeting.textContent = "Привет! Я готов пообщаться.";
+        speech.textContent = '"Здорово! Че как?"';
+        greeting.textContent = "Здорово! Че как?";
       } else if (currentLang === 'uz') {
-        speech.textContent = '"Salom! Men Twin-man. Asosiy tilim o\'zbek tili!"';
-        greeting.textContent = "Salom! Men muloqotga tayyorman.";
+        speech.textContent = '"Salom! Qalayisan?"';
+        greeting.textContent = "Salom! Qalayisan?";
       } else {
-        speech.textContent = '"Hello! I\'m Twin. English is my default language!"';
-        greeting.textContent = "Hello! I'm ready to talk.";
+        speech.textContent = '"Hey! What\'s up?"';
+        greeting.textContent = "Hey! What's up?";
       }
     }
 
-    // Chat function linked to Cloudflare worker proxy
     async function sendMsg() {
       const input = document.getElementById('chat-input');
       const text = input.value.trim();
@@ -491,7 +240,7 @@
         });
         
         const data = await response.json();
-        let botReply = data.reply || "I'm listening.";
+        let botReply = data.reply || "Yeah, totally.";
 
         const botBubble = document.createElement('div');
         botBubble.className = 'msg bot';
@@ -504,7 +253,7 @@
         console.error("AI connection error:", error);
         const errBubble = document.createElement('div');
         errBubble.className = 'msg bot';
-        errBubble.textContent = "Error connecting to AI proxy.";
+        errBubble.textContent = "Connection hiccup.";
         chatStream.appendChild(errBubble);
       } finally {
         mainAvatar.classList.remove('talking');
@@ -513,42 +262,31 @@
 
     function handleKey(e) { if (e.key === 'Enter') sendMsg(); }
 
-    // Call and Media Device Toggles
     async function startCall() {
       goToScreen('screen-call');
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         document.getElementById('userCamFeed').srcObject = mediaStream;
-        document.getElementById('call-status').textContent = "00:01 (Connected)";
+        document.getElementById('call-status').textContent = "Live Call";
       } catch (err) {
-        document.getElementById('call-status').textContent = "Connected (Audio Only)";
+        document.getElementById('call-status').textContent = "Audio Only Call";
       }
     }
 
     function toggleMic() {
       if (mediaStream) {
-        const audioTrack = mediaStream.getAudioTracks()[0];
-        if (audioTrack) {
-          isMicOn = !isMicOn;
-          audioTrack.enabled = isMicOn;
-          const btn = document.getElementById('btnToggleMic');
-          btn.classList.toggle('off', !isMicOn);
-          btn.textContent = isMicOn ? '🎤' : '🎙️❌';
-        }
+        isMicOn = !isMicOn;
+        mediaStream.getAudioTracks()[0].enabled = isMicOn;
+        document.getElementById('btnToggleMic').classList.toggle('off', !isMicOn);
       }
     }
 
     function toggleCam() {
       if (mediaStream) {
-        const videoTrack = mediaStream.getVideoTracks()[0];
-        if (videoTrack) {
-          isCamOn = !isCamOn;
-          videoTrack.enabled = isCamOn;
-          const btn = document.getElementById('btnToggleCam');
-          btn.classList.toggle('off', !isCamOn);
-          btn.textContent = isCamOn ? '📹' : '📷❌';
-          document.getElementById('userCamFeed').style.display = isCamOn ? 'block' : 'none';
-        }
+        isCamOn = !isCamOn;
+        mediaStream.getVideoTracks()[0].enabled = isCamOn;
+        document.getElementById('btnToggleCam').classList.toggle('off', !isCamOn);
+        document.getElementById('userCamFeed').style.display = isCamOn ? 'block' : 'none';
       }
     }
 
