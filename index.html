@@ -37,6 +37,52 @@
       height: 800px;
       background-color: var(--bg-color);
       border-radius: 40px;
+      border: 8px solidIt looks like a previous response got accidentally pasted right into the middle of your CSS line `.chat-input button { background: var(--primary`! 
+
+Here is the fully repaired and completed code. It includes the finished CSS, the HTML layout for the phone-like UI, the JavaScript to handle adding messages to the chat, and the code to request the camera and microphone permissions when the header buttons are clicked.
+
+Save this entirely as your `index.html` file:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Twin - Your Realistic AI Companion</title>
+  <style>
+    :root {
+      --bg-color: #09090b;
+      --surface-color: #18181b;
+      --primary: #ffffff;
+      --accent: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #27272a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: var(--text-main);
+    }
+
+    .app-frame {
+      width: 100%;
+      max-width: 400px;
+      height: 800px;
+      background-color: var(--bg-color);
+      border-radius: 40px;
       border: 8px solid #1f1f22;
       overflow: hidden;
       position: relative;
@@ -114,6 +160,11 @@
       border-radius: 50%;
       cursor: pointer;
       margin-left: 10px;
+      transition: background 0.2s;
+    }
+
+    .chat-header .actions button:hover {
+      background: var(--border);
     }
 
     .chat-area {
@@ -122,6 +173,7 @@
       display: flex;
       flex-direction: column;
       gap: 15px;
+      padding-right: 5px;
     }
 
     .msg {
@@ -130,6 +182,7 @@
       border-radius: 18px;
       font-size: 0.95rem;
       line-height: 1.4;
+      word-wrap: break-word;
     }
 
     .msg.bot {
@@ -151,55 +204,121 @@
       margin-top: 15px;
     }
 
-    .chat-input input { margin-bottom: 0; }
-    .chat-input button {
-      background: var(--primaryYay, we are definitely making progress! Looking at `image_57f7fc.png`, I can see exactly what you mean. The bot is just repeating that same "I'm listening!" phrase instead of actually talking to you when you say "I'm cool, wbu?" or "hey". 
-
-Here is how we fix the repeating issue, make it respond in the user's language, and get those microphone and camera permissions working.
-
-### 1. Fixing the Repeated Text & Language Mirroring
-
-Right now, your code is likely firing a hardcoded, default response every time you hit "send" instead of actually processing what you typed. 
-
-To make the Twin smart and have it match the user's language, you need to send the user's message to an AI backend (like the OpenAI API, Gemini API, or Claude) and include a **System Prompt**. 
-
-If you are using an API, you just need to add an instruction like this to the system setup:
-> *"You are a friendly virtual twin. You must detect the language of the user's input and reply exclusively in that exact same language. Do not use canned responses; have a real conversation."*
-
-When you send the user's input to the AI with that rule, it will automatically switch between English, Russian, Uzbek, or whatever else the user types, and it will actually answer your questions instead of repeating itself!
-
-### 2. Asking Chrome for Microphone and Camera Permissions
-
-To get that popup in Chrome asking the user to allow their mic and camera (perfect for those two buttons in the top right of your UI), you need to use the browser's built-in `navigator.mediaDevices.getUserMedia` API. 
-
-Here is the JavaScript code you can link to your video/mic buttons:
-
-```javascript
-// Function to request Camera and Microphone
-async function requestMediaPermissions() {
-    try {
-        // This line triggers the Chrome permission popup!
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: true, 
-            audio: true 
-        });
-        
-        console.log("Success! Camera and Microphone access granted.");
-        
-        // TODO: You can now take 'stream' and attach it to an HTML <video> element
-        // document.getElementById('myVideo').srcObject = stream;
-
-    } catch (error) {
-        console.error("Error accessing media devices:", error);
-        
-        // If the user clicks "Block" or doesn't have a mic/cam
-        if (error.name === 'NotAllowedError') {
-            alert("Please allow camera and microphone access in your browser settings to use this feature.");
-        } else {
-            alert("Could not find a camera or microphone.");
-        }
+    .chat-input input {
+      margin-bottom: 0;
+      flex: 1;
     }
-}
+    
+    .chat-input button {
+      background: var(--primary);
+      color: #000;
+      border: none;
+      padding: 0 20px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
 
-// Example: Attach this to your button clicks
-// document.getElementById('videoCallButton').addEventListener('click', requestMediaPermissions);
+    .chat-input button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-frame">
+    <!-- Chat Screen -->
+    <div class="screen active" id="chatScreen">
+      
+      <div class="chat-header">
+        <h2>Twin AI</h2>
+        <div class="actions">
+          <button id="micButton" title="Microphone">🎤</button>
+          <button id="camButton" title="Camera">📹</button>
+        </div>
+      </div>
+
+      <div class="chat-area" id="chatBox">
+        <div class="msg bot">Hi! I'm your Twin. I'm ready to chat.</div>
+      </div>
+
+      <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+        <button id="sendButton">Send</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- 1. MEDIA PERMISSIONS (MIC & CAMERA) ---
+    async function requestMediaPermissions(type) {
+      try {
+        const constraints = {
+          video: type === 'camera',
+          audio: true 
+        };
+        
+        // This triggers the browser permission popup
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log(`Success! ${type} access granted.`);
+        alert(`${type === 'camera' ? 'Camera' : 'Microphone'} access granted! (Ready to attach to a video element)`);
+        
+      } catch (error) {
+        console.error("Error accessing media devices:", error);
+        if (error.name === 'NotAllowedError') {
+          alert("Please allow camera and microphone access in your browser settings to use this feature.");
+        } else {
+          alert("Could not find a camera or microphone on this device.");
+        }
+      }
+    }
+
+    document.getElementById('micButton').addEventListener('click', () => requestMediaPermissions('mic'));
+    document.getElementById('camButton').addEventListener('click', () => requestMediaPermissions('camera'));
+
+
+    // --- 2. CHAT FUNCTIONALITY ---
+    const chatBox = document.getElementById('chatBox');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+
+    function addMessage(text, sender) {
+      const msgDiv = document.createElement('div');
+      msgDiv.classList.add('msg', sender);
+      msgDiv.textContent = text;
+      chatBox.appendChild(msgDiv);
+      
+      // Auto-scroll to the bottom
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function handleSend() {
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      // 1. Add User Message
+      addMessage(text, 'user');
+      messageInput.value = '';
+
+      // 2. Fetch AI Response (Placeholder for your API Call)
+      // To fix the "repeating text" issue, this is where you would send 'text' to OpenAI/Gemini.
+      setTimeout(() => {
+        // Mock response to demonstrate UI working
+        addMessage(`I heard you say: "${text}". Connect me to an API to have a real conversation!`, 'bot');
+      }, 800);
+    }
+
+    sendButton.addEventListener('click', handleSend);
+
+    // Allow pressing "Enter" to send
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        handleSend();
+      }
+    });
+  </script>
+
+</body>
+</html>
