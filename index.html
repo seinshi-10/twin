@@ -182,7 +182,6 @@
     let activeUtterance = null;
     let chatHistory = [];
 
-    // Preload system voices
     let systemVoices = [];
     if ('speechSynthesis' in window) {
       systemVoices = window.speechSynthesis.getVoices();
@@ -214,8 +213,14 @@
       }
       chatHistory.forEach(msg => {
         const bubble = document.createElement('div');
+        // Handle potential array content for multimodal history display
+        let textContent = msg.content;
+        if (Array.isArray(msg.content)) {
+          const textPart = msg.content.find(p => p.type === 'text');
+          textContent = textPart ? textPart.text : '[Image shared]';
+        }
         bubble.className = msg.role === 'user' ? 'msg user' : 'msg bot';
-        bubble.textContent = msg.content;
+        bubble.textContent = textContent;
         chatStream.appendChild(bubble);
       });
       chatStream.scrollTop = chatStream.scrollHeight;
@@ -245,14 +250,25 @@
       }
     }
 
-    async function askAI(userText) {
+    function captureCameraSnapshot() {
+      const video = document.getElementById('userCamFeed');
+      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', 0.7);
+    }
+
+    async function askAI(userText, imageData = null) {
       chatHistory.push({ role: "user", content: userText });
 
       try {
         const response = await fetch("https://twin-proxy.tazabaevmaman07.workers.dev", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: chatHistory, language: currentLang })
+          body: JSON.stringify({ messages: chatHistory, language: currentLang, image: imageData })
         });
         const data = await response.json();
         const botReply = data.reply || "Yeah, totally.";
@@ -294,7 +310,6 @@
         const langCode = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'uz' ? 'uz-UZ' : 'en-US');
         activeUtterance.lang = langCode;
 
-        // Select a higher-quality, realistic voice if available
         const voices = systemVoices.length > 0 ? systemVoices : window.speechSynthesis.getVoices();
         let targetVoice = null;
 
@@ -324,13 +339,13 @@
     async function startCall() {
       isCallActive = true;
       goToScreen('screen-call');
-      document.getElementById('call-status').textContent = "Call Connected (Listening...)";
+      document.getElementById('call-status').textContent = "Call Connected (Vision Active)";
 
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         document.getElementById('userCamFeed').srcObject = mediaStream;
       } catch (err) {
-        document.getElementById('call-status').textContent = "Call Connected (Audio/Speech Only)";
+        document.getElementById('call-status').textContent = "Call Connected (Audio Only - No Camera)";
       }
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -347,7 +362,11 @@
 
           const callAvatar = document.getElementById('callAvatar3D');
           callAvatar.classList.add('talking');
-          const reply = await askAI(speechResult);
+
+          // Snap frame from camera when user speaks
+          const snapshot = captureCameraSnapshot();
+
+          const reply = await askAI(speechResult, snapshot);
           
           document.getElementById('callSpeechBubble').textContent = `Twin: "${reply}"`;
           speakText(reply, callAvatar);
