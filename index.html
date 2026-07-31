@@ -156,7 +156,7 @@
     <div id="screen-call" class="screen">
       <div class="top-nav">
         <button class="btn-icon" onclick="endCall()">←</button>
-        <h3 id="call-status">Call Connected (Listening...)</h3>
+        <h3 id="call-status">Call Connected (Vision Active)</h3>
       </div>
       <div class="twin-viewport-container" style="flex:1;">
         <div class="avatar-3d-stage" id="callAvatar3D"></div>
@@ -213,7 +213,6 @@
       }
       chatHistory.forEach(msg => {
         const bubble = document.createElement('div');
-        // Handle potential array content for multimodal history display
         let textContent = msg.content;
         if (Array.isArray(msg.content)) {
           const textPart = msg.content.find(p => p.type === 'text');
@@ -250,25 +249,29 @@
       }
     }
 
+    // Shrink snapshot to tiny thumbnail to preserve TPM rate limit
     function captureCameraSnapshot() {
       const video = document.getElementById('userCamFeed');
       if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 320;
-      canvas.height = video.videoHeight || 240;
+      canvas.width = 160;
+      canvas.height = 120;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg', 0.7);
+      return canvas.toDataURL('image/jpeg', 0.4);
     }
 
     async function askAI(userText, imageData = null) {
       chatHistory.push({ role: "user", content: userText });
 
       try {
+        // Send only the last 4 messages to prevent token bloat
+        const recentMessages = chatHistory.slice(-4);
+
         const response = await fetch("https://twin-proxy.tazabaevmaman07.workers.dev", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: chatHistory, language: currentLang, image: imageData })
+          body: JSON.stringify({ messages: recentMessages, language: currentLang, image: imageData })
         });
         const data = await response.json();
         const botReply = data.reply || "Yeah, totally.";
@@ -363,9 +366,7 @@
           const callAvatar = document.getElementById('callAvatar3D');
           callAvatar.classList.add('talking');
 
-          // Snap frame from camera when user speaks
           const snapshot = captureCameraSnapshot();
-
           const reply = await askAI(speechResult, snapshot);
           
           document.getElementById('callSpeechBubble').textContent = `Twin: "${reply}"`;
