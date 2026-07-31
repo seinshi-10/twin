@@ -107,7 +107,7 @@
       </div>
 
       <div class="main-actions-grid">
-        <div class="action-card" onclick="goToScreen('screen-chat')">
+        <div class="action-card" onclick="openChatScreen()">
           <span style="font-size: 1.5rem;">💬</span>
           <span style="font-size: 0.95rem; font-weight: 700;">Text Chat</span>
           <span style="font-size: 0.75rem; color: var(--text-muted);">Chat with Twin</span>
@@ -180,13 +180,45 @@
     let recognition = null;
     let isCallActive = false;
     let activeUtterance = null;
-    
-    // Global conversation history array to remember all past messages
     let chatHistory = [];
+
+    // Preload system voices
+    let systemVoices = [];
+    if ('speechSynthesis' in window) {
+      systemVoices = window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        systemVoices = window.speechSynthesis.getVoices();
+      };
+    }
 
     function goToScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(screenId).classList.add('active');
+    }
+
+    function openChatScreen() {
+      goToScreen('screen-chat');
+      renderChatHistory();
+    }
+
+    function renderChatHistory() {
+      const chatStream = document.getElementById('chat-stream');
+      chatStream.innerHTML = '';
+      if (chatHistory.length === 0) {
+        const greeting = document.createElement('div');
+        greeting.className = 'msg bot';
+        greeting.id = 'chatGreeting';
+        greeting.textContent = currentLang === 'ru' ? 'Здорово! Че как?' : (currentLang === 'uz' ? 'Salom! Qalayisan?' : "Hey! What's up?");
+        chatStream.appendChild(greeting);
+        return;
+      }
+      chatHistory.forEach(msg => {
+        const bubble = document.createElement('div');
+        bubble.className = msg.role === 'user' ? 'msg user' : 'msg bot';
+        bubble.textContent = msg.content;
+        chatStream.appendChild(bubble);
+      });
+      chatStream.scrollTop = chatStream.scrollHeight;
     }
 
     function generateTwinVisual() {
@@ -203,23 +235,17 @@
     function updateLanguage() {
       currentLang = document.getElementById('languageSelect').value;
       const speech = document.getElementById('avatarSpeech');
-      const greeting = document.getElementById('chatGreeting');
 
       if (currentLang === 'ru') {
         speech.textContent = '"Здорово! Че как?"';
-        greeting.textContent = "Здорово! Че как?";
       } else if (currentLang === 'uz') {
         speech.textContent = '"Salom! Qalayisan?"';
-        greeting.textContent = "Salom! Qalayisan?";
       } else {
         speech.textContent = '"Hey! What\'s up?"';
-        greeting.textContent = "Hey! What's up?";
       }
     }
 
-    // Sends the full conversation history to the Cloudflare Worker proxy
     async function askAI(userText) {
-      // Append user message to history
       chatHistory.push({ role: "user", content: userText });
 
       try {
@@ -231,9 +257,7 @@
         const data = await response.json();
         const botReply = data.reply || "Yeah, totally.";
 
-        // Append assistant response to history
         chatHistory.push({ role: "assistant", content: botReply });
-
         return botReply;
       } catch (error) {
         console.error("AI connection error:", error);
@@ -246,25 +270,14 @@
       const text = input.value.trim();
       if (!text) return;
 
-      const chatStream = document.getElementById('chat-stream');
-      const userBubble = document.createElement('div');
-      userBubble.className = 'msg user';
-      userBubble.textContent = text;
-      chatStream.appendChild(userBubble);
       input.value = '';
-      chatStream.scrollTop = chatStream.scrollHeight;
-
+      
       const mainAvatar = document.getElementById('mainAvatar3D');
       const mainSpeech = document.getElementById('avatarSpeech');
       mainAvatar.classList.add('talking');
 
       const botReply = await askAI(text);
-
-      const botBubble = document.createElement('div');
-      botBubble.className = 'msg bot';
-      botBubble.textContent = botReply;
-      chatStream.appendChild(botBubble);
-      chatStream.scrollTop = chatStream.scrollHeight;
+      renderChatHistory();
       
       mainSpeech.textContent = `"${botReply}"`;
       mainAvatar.classList.remove('talking');
@@ -277,8 +290,29 @@
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         activeUtterance = new SpeechSynthesisUtterance(text);
-        activeUtterance.lang = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'uz' ? 'uz-UZ' : 'en-US');
         
+        const langCode = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'uz' ? 'uz-UZ' : 'en-US');
+        activeUtterance.lang = langCode;
+
+        // Select a higher-quality, realistic voice if available
+        const voices = systemVoices.length > 0 ? systemVoices : window.speechSynthesis.getVoices();
+        let targetVoice = null;
+
+        if (currentLang === 'ru') {
+          targetVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Google') || v.name.includes('Milena') || v.name.includes('Katya') || v.name.includes('Pavel') || v.name.includes('Natural'))) || voices.find(v => v.lang.includes('ru'));
+        } else if (currentLang === 'uz') {
+          targetVoice = voices.find(v => v.lang.includes('uz') || v.lang.includes('kk'));
+        } else {
+          targetVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || voices.find(v => v.lang.includes('en'));
+        }
+
+        if (targetVoice) {
+          activeUtterance.voice = targetVoice;
+        }
+
+        activeUtterance.pitch = 1.0;
+        activeUtterance.rate = 1.0;
+
         avatarElement.classList.add('talking');
         activeUtterance.onend = () => avatarElement.classList.remove('talking');
         activeUtterance.onerror = () => avatarElement.classList.remove('talking');
