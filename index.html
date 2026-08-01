@@ -463,51 +463,65 @@
     }
 
     // Unified Command Processor & Tag Stripper
-    function processAndCleanReply(text) {
-      let cleaned = text;
+    // Robust Command Processor & Navigation Fix
+function processAndCleanReply(text) {
+  let cleaned = text;
 
-      // 1. Process PLAY_MEDIA tag
-      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
-      if (playMatch) {
-        const query = playMatch[1].trim();
-        playMediaTrack(query);
-        cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
-      }
+  // 1. Process PLAY_MEDIA tag (Opens direct search in YouTube)
+  const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
+  if (playMatch) {
+    const query = playMatch[1].trim();
+    playMediaTrack(query);
+    cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
+  }
 
-      // 2. Process NAVIGATE tag (Handles YouTube, Google Classroom, and General URLs)
-      const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-      if (navMatch) {
-        const target = navMatch[1].trim().toLowerCase();
-        
-        // Prevent opening duplicate tabs if PLAY_MEDIA was already triggered
-        if (!playMatch || !target.includes("youtube")) {
-          if (target.includes("classroom")) {
-            let opened = false;
-            for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
-              if (target.includes(className)) {
-                window.open(url, '_blank');
-                opened = true;
-                break;
-              }
-            }
-            if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
-          } else if (target.includes("youtube")) {
-            window.open("https://www.youtube.com", "_blank");
-          } else {
-            window.open(target.startsWith('http') ? target : `https://${target}`, '_blank');
+  // 2. Process NAVIGATE tag
+  const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
+  if (navMatch) {
+    let target = navMatch[1].trim().toLowerCase();
+    
+    // Clean trailing slashes or extra spaces from AI tag
+    target = target.replace(/\/+$/, '');
+
+    const isYoutubeNav = target.includes("youtube");
+
+    // Don't open a generic YouTube home tab if PLAY_MEDIA already opened the video search
+    if (!playMatch || !isYoutubeNav) {
+      if (target.includes("classroom")) {
+        let opened = false;
+        for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
+          if (target.includes(className)) {
+            window.open(url, '_blank');
+            opened = true;
+            break;
           }
         }
-        cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+        if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
+      } else if (isYoutubeNav) {
+        window.open("https://www.youtube.com", "_blank");
+      } else {
+        // Guarantee valid protocol + domain formatting (prevents opening local folders)
+        let finalUrl = target;
+        if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+          if (!finalUrl.includes(".")) {
+            finalUrl = `https://www.${finalUrl}.com`;
+          } else {
+            finalUrl = `https://${finalUrl}`;
+          }
+        }
+        window.open(finalUrl, '_blank');
       }
-
-      // 3. Process volume, quality, and control tags (strips them from output)
-      cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
-      cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
-      cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
-
-      return cleaned.trim();
     }
+    cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+  }
 
+  // 3. Clean remaining control tags
+  cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+  cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
+  cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
+
+  return cleaned.trim();
+}
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
