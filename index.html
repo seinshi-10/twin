@@ -164,27 +164,8 @@
     @keyframes rotateRing { 100% { transform: rotate(360deg); } }
     @keyframes rotateRingRev { 100% { transform: rotate(-360deg); } }
 
-    /* EMBEDDED MEDIA PLAYER STYLES */
-    .media-container {
-      width: 100%;
-      height: 180px;
-      margin-top: 15px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--panel-border);
-      display: none;
-      background: #000;
-      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
-    }
-
-    .media-container iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
     .subtitle-box {
-      margin-top: 20px;
+      margin-top: 25px;
       width: 100%;
       min-height: 54px;
       background: var(--panel);
@@ -353,9 +334,6 @@
     .ctrl-btn.off { border-color: var(--danger); color: var(--danger); }
     .ctrl-btn.end { background: var(--danger); border-color: var(--danger); color: #fff; }
   </style>
-  
-  <!-- YOUTUBE IFRAME API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
@@ -375,11 +353,6 @@
           <div class="ring ring-outer"></div>
           <div class="ring ring-mid"></div>
           <div class="ring ring-inner"></div>
-        </div>
-
-        <!-- Embedded YouTube Player Container -->
-        <div class="media-container" id="mediaContainer">
-          <div id="yt-player"></div>
         </div>
 
         <div class="subtitle-box" id="mainSubtitle">
@@ -455,42 +428,6 @@
     let isCamOn = true;
     let systemVoices = [];
 
-    // YOUTUBE IFRAME INTEGRATION
-    let ytPlayer = null;
-    let isPlayerReady = false;
-
-    function onYouTubeIframeAPIReady() {
-      ytPlayer = new YT.Player('yt-player', {
-        height: '100%',
-        width: '100%',
-        playerVars: {
-          'autoplay': 1,
-          'controls': 1,
-          'modestbranding': 1,
-          'rel': 0
-        },
-        events: {
-          'onReady': () => { isPlayerReady = true; }
-        }
-      });
-    }
-
-    function playYouTubeVideoId(videoId) {
-      document.getElementById('mediaContainer').style.display = 'block';
-      if (ytPlayer && isPlayerReady && ytPlayer.loadVideoById) {
-        ytPlayer.loadVideoById(videoId);
-        ytPlayer.playVideo();
-      } else {
-        setTimeout(() => playYouTubeVideoId(videoId), 500);
-      }
-    }
-
-    function setAppVolume(percent) {
-      if (ytPlayer && isPlayerReady && ytPlayer.setVolume) {
-        ytPlayer.setVolume(percent);
-      }
-    }
-
     // TTS VOICE INITIALIZATION
     function initSpeech() {
       if ('speechSynthesis' in window) {
@@ -539,26 +476,20 @@
     function processAndCleanReply(text) {
       let cleaned = text;
 
-      // 1. Play video directly inside app using YouTube iFrame API
+      // 1. Open video in a NEW Chrome tab
       const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
       if (videoIdMatch) {
-       window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
-    }
+        window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
+      }
 
-      // 2. Open standard web pages if explicitly asked
+      // 2. Open standard web page or search query
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
       if (navMatch && !videoIdMatch) {
         openUniversalUrl(navMatch[1].trim());
       }
 
-      // 3. Set volume directly inside app
-      const volMatch = cleaned.match(/\[\[SET_VOLUME:\s*(\d+)\]\]/i);
-      if (volMatch) {
-        setAppVolume(parseInt(volMatch[1], 10));
-      }
-
-      // 4. Clean all control tags so raw code NEVER shows in the chat UI
-      cleaned = cleaned.replace(/\[\[[A-Z_]+:\s*.*?\]\]/gi, '');
+      // 3. Clean ALL bracketed tags so no code ever leaks into the chat bubble
+      cleaned = cleaned.replace(/\[\[.*?\]\]/gi, '');
 
       return cleaned.trim();
     }
