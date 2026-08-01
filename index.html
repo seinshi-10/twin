@@ -3,177 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Twin - Your Realistic AI Companion</title>
+  <title>J.A.R.V.I.S. System</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
     :root {
-      --bg-color: #09090b;
-      --surface-color: #18181b;
-      --surface-border: #27272a;
-      --primary: #ffffff;
-      --accent: #3b82f6;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --danger: #ef4444;
+      --bg-color: #030a10;
+      --surface-color: #061524;
+      --surface-border: #0a2540;
+      --primary: #00ffff; /* JARVIS Cyan */
+      --accent: #0088ff;
+      --text-main: #00ffff;
+      --text-muted: #00aaff;
+      --danger: #ff003c;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Share Tech Mono', monospace; }
     body { background-color: #000000; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: var(--text-main); }
-    .app-frame { width: 100%; max-width: 410px; height: 820px; background-color: var(--bg-color); border-radius: 44px; border: 8px solid #1f1f22; overflow: hidden; position: relative; box-shadow: 0 0 60px rgba(0,0,0,0.9); display: flex; flex-direction: column; }
-    .screen { display: none; flex-direction: column; height: 100%; width: 100%; padding: 24px 20px; animation: fadeIn 0.3s ease; overflow-y: auto; }
+    
+    .app-frame { width: 100%; max-width: 410px; height: 820px; background: radial-gradient(circle at center, #061524 0%, #030a10 100%); border-radius: 20px; border: 2px solid var(--primary); box-shadow: 0 0 30px rgba(0, 255, 255, 0.2); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+    .screen { display: none; flex-direction: column; height: 100%; width: 100%; padding: 24px 20px; animation: glitchIn 0.3s ease; overflow-y: auto; }
     .screen.active { display: flex; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    
+    @keyframes glitchIn { 
+      0% { opacity: 0; filter: contrast(200%) hue-rotate(90deg); transform: scale(0.98); } 
+      100% { opacity: 1; filter: contrast(100%) hue-rotate(0deg); transform: scale(1); } 
+    }
 
-    h2, h3 { font-weight: 700; letter-spacing: -0.5px; }
+    h2, h3 { text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid var(--primary); padding-bottom: 5px; margin-bottom: 10px; }
     p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4; }
 
-    .field-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-    label { font-size: 0.85rem; color: var(--text-muted); }
-    input, textarea, select { width: 100%; background: var(--surface-color); border: 1px solid var(--surface-border); color: var(--text-main); padding: 14px 16px; border-radius: 14px; font-size: 0.95rem; outline: none; }
-    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    button.btn-primary { width: 100%; background: transparent; color: var(--primary); border: 1px solid var(--primary); padding: 16px; border-radius: 4px; font-size: 1rem; text-transform: uppercase; cursor: pointer; margin-top: auto; transition: all 0.2s; box-shadow: inset 0 0 10px rgba(0,255,255,0.1); }
+    button.btn-primary:hover { background: var(--primary); color: #000; box-shadow: 0 0 20px var(--primary); }
 
-    button.btn-primary { width: 100%; background: var(--primary); color: #000000; border: none; padding: 16px; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: auto; transition: opacity 0.2s; }
-    button.btn-primary:hover { opacity: 0.95; }
+    .top-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .btn-icon { background: transparent; border: 1px solid var(--primary); color: var(--primary); width: 38px; height: 38px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-icon:hover { background: var(--primary); color: #000; }
 
-    .top-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
-    .btn-icon { background: var(--surface-color); border: 1px solid var(--surface-border); color: var(--text-main); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
-
-    .twin-viewport-container { flex: 1; background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 80%); border-radius: 28px; border: 1px solid var(--surface-border); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.8); }
+    .twin-viewport-container { flex: 1; border: 1px solid var(--primary); background: rgba(0, 255, 255, 0.02); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px; overflow: hidden; }
     
-    .avatar-3d-stage { width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #60a5fa, #3b82f6 40%, #1d4ed8 70%, #0f172a 100%); background-size: cover; background-position: center; box-shadow: 0 0 50px rgba(59, 130, 246, 0.5), inset -10px -10px 30px rgba(0,0,0,0.6); position: relative; animation: idleFloat 4s ease-in-out infinite; }
-    .avatar-3d-stage.talking { animation: talkGlow 0.5s infinite alternate ease-in-out; }
+    /* JARVIS Core Visualizer */
+    .jarvis-core { width: 150px; height: 150px; border-radius: 50%; border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary), inset 0 0 20px var(--primary); position: relative; animation: idleSpin 10s linear infinite; display: flex; justify-content: center; align-items: center; }
+    .jarvis-core::before { content: ''; position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 4px dashed var(--accent); animation: reverseSpin 8s linear infinite; }
+    .jarvis-core::after { content: ''; position: absolute; width: 60px; height: 60px; border-radius: 50%; background: var(--primary); filter: blur(15px); opacity: 0.5; animation: pulse 2s ease-in-out infinite; }
+    
+    .jarvis-core.talking { animation: talkPulse 0.2s infinite alternate; }
+    .jarvis-core.talking::after { opacity: 1; filter: blur(25px); }
 
-    @keyframes idleFloat { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.02); } }
-    @keyframes talkGlow { from { transform: scale(1); box-shadow: 0 0 40px rgba(59, 130, 246, 0.4); } to { transform: scale(1.08); box-shadow: 0 0 80px rgba(236, 72, 153, 0.8); } }
+    @keyframes idleSpin { 100% { transform: rotate(360deg); } }
+    @keyframes reverseSpin { 100% { transform: rotate(-360deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.2); opacity: 0.6; } }
+    @keyframes talkPulse { from { transform: scale(1); box-shadow: 0 0 20px var(--primary); } to { transform: scale(1.1); box-shadow: 0 0 60px var(--primary), inset 0 0 40px var(--primary); } }
 
-    .avatar-dialogue-bubble { position: absolute; bottom: 15px; left: 15px; right: 15px; background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(10px); border: 1px solid var(--surface-border); padding: 12px 16px; border-radius: 16px; font-size: 0.85rem; text-align: center; color: var(--text-main); }
+    .avatar-dialogue-bubble { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0, 10, 20, 0.9); border: 1px solid var(--primary); padding: 12px; font-size: 0.85rem; text-align: center; color: var(--primary); }
+    
     .main-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .action-card { background: var(--surface-color); border: 1px solid var(--surface-border); padding: 18px; border-radius: 20px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s; }
-    .action-card:hover { border-color: var(--accent); }
+    .action-card { background: transparent; border: 1px solid var(--surface-border); padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; text-align: center; transition: all 0.2s; }
+    .action-card:hover { border-color: var(--primary); box-shadow: 0 0 15px rgba(0,255,255,0.2); }
 
-    .user-self-video { position: absolute; top: 15px; right: 15px; width: 90px; height: 120px; background: #000; border-radius: 14px; border: 2px solid var(--surface-border); object-fit: cover; transform: scaleX(-1); }
+    .user-self-video { position: absolute; top: 10px; right: 10px; width: 100px; height: 75px; background: #000; border: 1px solid var(--primary); object-fit: cover; opacity: 0.7; }
+    
     .call-controls-bar { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
-    .call-btn { width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--surface-border); background: var(--surface-color); color: var(--text-main); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .call-btn.off { background: rgba(239, 68, 68, 0.2); border-color: var(--danger); color: var(--danger); }
-    .call-btn.hangup { background: var(--danger); color: #fff; border: none; }
+    .call-btn { width: 50px; height: 50px; background: transparent; border: 1px solid var(--primary); color: var(--primary); font-size: 1.2rem; cursor: pointer; }
+    .call-btn.off { border-color: var(--danger); color: var(--danger); }
+    .call-btn.hangup { background: rgba(255, 0, 60, 0.2); border-color: var(--danger); color: var(--danger); }
+    .call-btn.hangup:hover { background: var(--danger); color: #fff; }
 
-    .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-    .msg { max-width: 82%; padding: 12px 16px; border-radius: 18px; font-size: 0.92rem; line-height: 1.45; }
-    .msg.bot { background: var(--surface-color); border: 1px solid var(--surface-border); align-self: flex-start; }
-    .msg.user { background: var(--accent); color: #fff; align-self: flex-end; }
+    .chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 5px; }
+    .msg { max-width: 85%; padding: 10px; font-size: 0.9rem; line-height: 1.4; border: 1px solid; }
+    .msg.bot { border-color: var(--primary); background: rgba(0, 255, 255, 0.05); color: var(--primary); align-self: flex-start; }
+    .msg.user { border-color: var(--text-muted); background: rgba(0, 170, 255, 0.1); color: var(--text-muted); align-self: flex-end; }
+    
     .chat-input-bar { display: flex; gap: 10px; margin-top: 15px; }
-    .chat-input-bar input { margin-bottom: 0; }
+    .chat-input-bar input { flex: 1; background: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 10px; outline: none; }
   </style>
 </head>
 <body>
 
   <div class="app-frame">
     
-    <!-- STEP 1: Registration -->
+    <!-- STEP 1: Boot Sequence -->
     <div id="screen-auth" class="screen active">
-      <h2 style="margin-top: 20px;">Create your Twin</h2>
-      <p>Set up your account to generate your AI companion.</p>
-      <div class="field-group">
-        <input type="text" placeholder="First Name">
-        <input type="text" placeholder="Last Name">
-        <input type="text" placeholder="Username">
-        <input type="password" placeholder="Password">
+      <h2 style="margin-top: 40px;">System Boot</h2>
+      <p>Initializing J.A.R.V.I.S. protocols...</p>
+      <div style="flex: 1; color: var(--primary); font-size: 0.8rem; line-height: 1.8; opacity: 0.7;">
+        > Loading visual cortex... OK<br>
+        > Bypassing mainframe... OK<br>
+        > Synchronizing voice matrix... OK<br>
+        > Establishing encrypted proxy link... OK<br>
       </div>
-      <button class="btn-primary" onclick="goToScreen('screen-setup')">Continue to AI Creator</button>
+      <button class="btn-primary" onclick="goToScreen('screen-main')">Initialize Interface</button>
     </div>
 
-    <!-- STEP 2: Twin Appearance Setup -->
-    <div id="screen-setup" class="screen">
-      <h2 style="margin-top: 20px;">Design Twin's Appearance</h2>
-      <p>Describe your companion's style, facial features, and vibe. This exact description will build your Twin's visual portrait.</p>
-      <textarea id="twinDescInput" rows="5" placeholder="e.g. A realistic young man with sharp jawline, short dark hair, wearing a black hoodie..."></textarea>
-      <button class="btn-primary" onclick="generateTwinVisual()">Generate Visual & Open Hub</button>
-    </div>
-
-    <!-- STEP 3: MAIN MENU -->
+    <!-- STEP 2: MAIN MENU -->
     <div id="screen-main" class="screen">
-      <div class="top-nav" style="justify-content: space-between;">
-        <div>
-          <h3>Alex (Twin)</h3>
-          <span style="font-size: 0.75rem; color: #10b981;">● Active Companion</span>
-        </div>
-        <button class="btn-icon" title="Settings" onclick="goToScreen('screen-settings')">⚙️</button>
+      <div class="top-nav">
+        <h3>J.A.R.V.I.S. System</h3>
+        <span style="font-size: 0.75rem; color: var(--primary); animation: pulse 2s infinite;">[ ONLINE ]</span>
       </div>
 
       <div class="twin-viewport-container">
-        <div class="avatar-3d-stage" id="mainAvatar3D"></div>
+        <div class="jarvis-core" id="mainAvatar3D"></div>
         <div class="avatar-dialogue-bubble" id="avatarSpeech">
-          "Hey! What's up?"
+          > "Good evening, Sir. Systems are fully operational."
         </div>
       </div>
 
       <div class="main-actions-grid">
         <div class="action-card" onclick="openChatScreen()">
-          <span style="font-size: 1.5rem;">💬</span>
-          <span style="font-size: 0.95rem; font-weight: 700;">Text Chat</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Chat with Twin</span>
+          <span style="font-size: 0.95rem; font-weight: bold;">TEXT_UPLINK</span>
+          <span style="font-size: 0.65rem; color: var(--text-muted);">Terminal Interface</span>
         </div>
         <div class="action-card" onclick="startCall()">
-          <span style="font-size: 1.5rem;">📞</span>
-          <span style="font-size: 0.95rem; font-weight: 700;">Interactive Call</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Voice & Video</span>
+          <span style="font-size: 0.95rem; font-weight: bold;">AV_OVERRIDE</span>
+          <span style="font-size: 0.65rem; color: var(--text-muted);">Voice & Optical</span>
         </div>
       </div>
     </div>
 
-    <!-- STEP 4: Settings -->
-    <div id="screen-settings" class="screen">
-      <div class="top-nav">
-        <button class="btn-icon" onclick="goToScreen('screen-main')">←</button>
-        <h3>Settings</h3>
-      </div>
-      <div class="field-group">
-        <label for="languageSelect">Twin Language Mode:</label>
-        <select id="languageSelect" onchange="updateLanguage()">
-          <option value="en" selected>English (Default)</option>
-          <option value="ru">Русский (Russian)</option>
-          <option value="uz">O'zbekcha (Uzbek)</option>
-        </select>
-      </div>
-      <button class="btn-primary" onclick="goToScreen('screen-main')">Save & Return</button>
-    </div>
-
-    <!-- STEP 5: Chat Screen -->
+    <!-- STEP 3: Chat Terminal -->
     <div id="screen-chat" class="screen">
       <div class="top-nav">
-        <button class="btn-icon" onclick="goToScreen('screen-main')">←</button>
-        <h3>Chat with Twin</h3>
+        <button class="btn-icon" onclick="goToScreen('screen-main')">ESC</button>
+        <h3>Terminal Uplink</h3>
       </div>
       <div class="chat-area" id="chat-stream">
-        <div class="msg bot" id="chatGreeting">Hey! What's up?</div>
+        <div class="msg bot" id="chatGreeting">> Good evening, Sir. How may I assist you today?</div>
       </div>
       <div class="chat-input-bar">
-        <input type="text" id="chat-input" placeholder="Say something..." onkeypress="handleKey(event)">
-        <button class="btn-primary" style="margin-top:0; width:auto; padding:0 20px;" onclick="sendMsg()">Send</button>
+        <input type="text" id="chat-input" placeholder="Enter command..." onkeypress="handleKey(event)">
+        <button class="btn-primary" style="margin-top:0; width:auto; padding:0 15px;" onclick="sendMsg()">EXE</button>
       </div>
     </div>
 
-    <!-- STEP 6: Call Screen -->
+    <!-- STEP 4: Call Screen -->
     <div id="screen-call" class="screen">
       <div class="top-nav">
-        <button class="btn-icon" onclick="endCall()">←</button>
-        <h3 id="call-status">Call Connected (Vision Active)</h3>
+        <button class="btn-icon" onclick="endCall()">ESC</button>
+        <h3 id="call-status">OPTICAL_LINK_ACTIVE</h3>
       </div>
       <div class="twin-viewport-container" style="flex:1;">
-        <div class="avatar-3d-stage" id="callAvatar3D"></div>
+        <div class="jarvis-core" id="callAvatar3D"></div>
         <video id="userCamFeed" class="user-self-video" autoplay playsinline muted></video>
-        <div class="avatar-dialogue-bubble" id="callSpeechBubble">"Listening to you..."</div>
+        <div class="avatar-dialogue-bubble" id="callSpeechBubble">> Awaiting audio input...</div>
       </div>
       <div class="call-controls-bar">
-        <button class="call-btn" id="btnToggleMic" title="Toggle Mic" onclick="toggleMic()">🎤</button>
-        <button class="call-btn" id="btnToggleCam" title="Toggle Camera" onclick="toggleCam()">📹</button>
-        <button class="call-btn hangup" title="End Call" onclick="endCall()">☎</button>
+        <button class="call-btn" id="btnToggleMic" onclick="toggleMic()">MIC</button>
+        <button class="call-btn" id="btnToggleCam" onclick="toggleCam()">OPT</button>
+        <button class="call-btn hangup" onclick="endCall()">END</button>
       </div>
     </div>
 
   </div>
 
   <script>
-    let currentLang = 'en';
     let mediaStream = null;
     let isMicOn = true;
     let isCamOn = true;
@@ -181,8 +164,8 @@
     let isCallActive = false;
     let activeUtterance = null;
     let chatHistory = [];
-
     let systemVoices = [];
+
     if ('speechSynthesis' in window) {
       systemVoices = window.speechSynthesis.getVoices();
       window.speechSynthesis.onvoiceschanged = () => {
@@ -206,8 +189,7 @@
       if (chatHistory.length === 0) {
         const greeting = document.createElement('div');
         greeting.className = 'msg bot';
-        greeting.id = 'chatGreeting';
-        greeting.textContent = currentLang === 'ru' ? 'Здорово! Че как?' : (currentLang === 'uz' ? 'Salom! Qalayisan?' : "Hey! What's up?");
+        greeting.textContent = '> Good evening, Sir. How may I assist you today?';
         chatStream.appendChild(greeting);
         return;
       }
@@ -216,40 +198,15 @@
         let textContent = msg.content;
         if (Array.isArray(msg.content)) {
           const textPart = msg.content.find(p => p.type === 'text');
-          textContent = textPart ? textPart.text : '[Image shared]';
+          textContent = textPart ? textPart.text : '[Visual data uploaded]';
         }
         bubble.className = msg.role === 'user' ? 'msg user' : 'msg bot';
-        bubble.textContent = textContent;
+        bubble.textContent = msg.role === 'user' ? `USR: ${textContent}` : `> ${textContent}`;
         chatStream.appendChild(bubble);
       });
       chatStream.scrollTop = chatStream.scrollHeight;
     }
 
-    function generateTwinVisual() {
-      const desc = document.getElementById('twinDescInput').value.trim() || "A realistic human companion portrait";
-      const prompt = encodeURIComponent(desc + ", high quality portrait, photorealistic digital art, detailed face lighting");
-      const imageUrl = `https://image.pollinations.ai/prompt/${prompt}`;
-
-      document.getElementById('mainAvatar3D').style.backgroundImage = `url('${imageUrl}')`;
-      document.getElementById('callAvatar3D').style.backgroundImage = `url('${imageUrl}')`;
-
-      goToScreen('screen-main');
-    }
-
-    function updateLanguage() {
-      currentLang = document.getElementById('languageSelect').value;
-      const speech = document.getElementById('avatarSpeech');
-
-      if (currentLang === 'ru') {
-        speech.textContent = '"Здорово! Че как?"';
-      } else if (currentLang === 'uz') {
-        speech.textContent = '"Salom! Qalayisan?"';
-      } else {
-        speech.textContent = '"Hey! What\'s up?"';
-      }
-    }
-
-    // Shrink snapshot to tiny thumbnail to preserve TPM rate limit
     function captureCameraSnapshot() {
       const video = document.getElementById('userCamFeed');
       if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
@@ -265,22 +222,21 @@
       chatHistory.push({ role: "user", content: userText });
 
       try {
-        // Send only the last 4 messages to prevent token bloat
         const recentMessages = chatHistory.slice(-4);
 
         const response = await fetch("https://twin-proxy.tazabaevmaman07.workers.dev", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: recentMessages, language: currentLang, image: imageData })
+          body: JSON.stringify({ messages: recentMessages, image: imageData }) // Removed language toggle
         });
         const data = await response.json();
-        const botReply = data.reply || "Yeah, totally.";
+        const botReply = data.reply || "Processing complete.";
 
         chatHistory.push({ role: "assistant", content: botReply });
         return botReply;
       } catch (error) {
         console.error("AI connection error:", error);
-        return "Connection hiccup.";
+        return "Network anomaly detected.";
       }
     }
 
@@ -294,11 +250,12 @@
       const mainAvatar = document.getElementById('mainAvatar3D');
       const mainSpeech = document.getElementById('avatarSpeech');
       mainAvatar.classList.add('talking');
+      mainSpeech.textContent = "> Processing request...";
 
       const botReply = await askAI(text);
       renderChatHistory();
       
-      mainSpeech.textContent = `"${botReply}"`;
+      mainSpeech.textContent = `> "${botReply}"`;
       mainAvatar.classList.remove('talking');
       speakText(botReply, mainAvatar);
     }
@@ -310,26 +267,22 @@
         window.speechSynthesis.cancel();
         activeUtterance = new SpeechSynthesisUtterance(text);
         
-        const langCode = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'uz' ? 'uz-UZ' : 'en-US');
-        activeUtterance.lang = langCode;
+        // Force British English
+        activeUtterance.lang = 'en-GB';
 
         const voices = systemVoices.length > 0 ? systemVoices : window.speechSynthesis.getVoices();
-        let targetVoice = null;
-
-        if (currentLang === 'ru') {
-          targetVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Google') || v.name.includes('Milena') || v.name.includes('Katya') || v.name.includes('Pavel') || v.name.includes('Natural'))) || voices.find(v => v.lang.includes('ru'));
-        } else if (currentLang === 'uz') {
-          targetVoice = voices.find(v => v.lang.includes('uz') || v.lang.includes('kk'));
-        } else {
-          targetVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || voices.find(v => v.lang.includes('en'));
-        }
+        
+        // Try to find a British Male voice specifically
+        const targetVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Brian'))) 
+                         || voices.find(v => v.lang === 'en-GB') 
+                         || voices.find(v => v.lang.includes('en'));
 
         if (targetVoice) {
           activeUtterance.voice = targetVoice;
         }
 
-        activeUtterance.pitch = 1.0;
-        activeUtterance.rate = 1.0;
+        activeUtterance.pitch = 0.9; // Slightly lower pitch for a sophisticated sound
+        activeUtterance.rate = 1.05; // Slightly faster for efficiency
 
         avatarElement.classList.add('talking');
         activeUtterance.onend = () => avatarElement.classList.remove('talking');
@@ -342,13 +295,12 @@
     async function startCall() {
       isCallActive = true;
       goToScreen('screen-call');
-      document.getElementById('call-status').textContent = "Call Connected (Vision Active)";
 
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         document.getElementById('userCamFeed').srcObject = mediaStream;
       } catch (err) {
-        document.getElementById('call-status').textContent = "Call Connected (Audio Only - No Camera)";
+        document.getElementById('call-status').textContent = "AUDIO_ONLY_MODE";
       }
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -356,12 +308,12 @@
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = false;
-        recognition.lang = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'uz' ? 'uz-UZ' : 'en-US');
+        recognition.lang = 'en-US'; // Leave US for recognition as it's generally more accurate for all accents
 
         recognition.onresult = async (event) => {
           if (!isCallActive) return;
           const speechResult = event.results[event.results.length - 1][0].transcript.trim();
-          document.getElementById('callSpeechBubble').textContent = `You: "${speechResult}"`;
+          document.getElementById('callSpeechBubble').textContent = `USR: "${speechResult}"`;
 
           const callAvatar = document.getElementById('callAvatar3D');
           callAvatar.classList.add('talking');
@@ -369,11 +321,10 @@
           const snapshot = captureCameraSnapshot();
           const reply = await askAI(speechResult, snapshot);
           
-          document.getElementById('callSpeechBubble').textContent = `Twin: "${reply}"`;
+          document.getElementById('callSpeechBubble').textContent = `> "${reply}"`;
           speakText(reply, callAvatar);
         };
 
-        recognition.onerror = (e) => { console.error("Speech recognition error", e); };
         recognition.onend = () => {
           if (isCallActive && isMicOn && recognition) {
             try { recognition.start(); } catch(e){}
@@ -381,8 +332,6 @@
         };
 
         try { recognition.start(); } catch(e){}
-      } else {
-        document.getElementById('callSpeechBubble').textContent = "Speech recognition not supported in this browser.";
       }
     }
 
