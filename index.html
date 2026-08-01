@@ -458,7 +458,7 @@
 
     // Opens YouTube search directly in a new tab
     function playMediaTrack(query) {
-      const targetUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1`;
+      const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       window.open(targetUrl, '_blank');
     }
 
@@ -467,7 +467,7 @@
 function processAndCleanReply(text) {
   let cleaned = text;
 
-  // 1. Process PLAY_MEDIA tag (Opens direct search in YouTube)
+  // 1. Process PLAY_MEDIA tag
   const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
   if (playMatch) {
     const query = playMatch[1].trim();
@@ -478,37 +478,37 @@ function processAndCleanReply(text) {
   // 2. Process NAVIGATE tag
   const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
   if (navMatch) {
-    let target = navMatch[1].trim().toLowerCase();
-    
-    // Clean trailing slashes or extra spaces from AI tag
-    target = target.replace(/\/+$/, '');
+    let target = navMatch[1].trim();
 
-    const isYoutubeNav = target.includes("youtube");
-
-    // Don't open a generic YouTube home tab if PLAY_MEDIA already opened the video search
-    if (!playMatch || !isYoutubeNav) {
-      if (target.includes("classroom")) {
+    // Only navigate if PLAY_MEDIA didn't already launch YouTube search
+    if (!playMatch) {
+      // Handle Google Classroom routes
+      if (target.toLowerCase().includes("classroom")) {
         let opened = false;
         for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
-          if (target.includes(className)) {
+          if (target.toLowerCase().includes(className)) {
             window.open(url, '_blank');
             opened = true;
             break;
           }
         }
         if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
-      } else if (isYoutubeNav) {
-        window.open("https://www.youtube.com", "_blank");
       } else {
-        // Guarantee valid protocol + domain formatting (prevents opening local folders)
         let finalUrl = target;
-        if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-          if (!finalUrl.includes(".")) {
-            finalUrl = `https://www.${finalUrl}.com`;
-          } else {
-            finalUrl = `https://${finalUrl}`;
-          }
+
+        // If target is ONLY "youtube" or "youtube.com", go to homepage
+        if (/^youtube(\.com)?\/?$/i.test(target)) {
+          finalUrl = "https://www.youtube.com";
+        } 
+        // Handle channel handles (e.g. "@mrbeast")
+        else if (target.startsWith("@")) {
+          finalUrl = `https://www.youtube.com/${target}`;
         }
+        // Ensure standard protocol for specific web addresses/channels
+        else if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+          finalUrl = `https://${finalUrl}`;
+        }
+
         window.open(finalUrl, '_blank');
       }
     }
