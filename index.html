@@ -542,8 +542,8 @@
       // 1. Play video directly inside app using YouTube iFrame API
       const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
       if (videoIdMatch) {
-        playYouTubeVideoId(videoIdMatch[1]);
-      }
+       window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
+    }
 
       // 2. Open standard web pages if explicitly asked
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
