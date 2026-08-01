@@ -418,7 +418,7 @@
   <script>
     const WORKER_URL = "https://twin-proxy.tazabaevmaman07.workers.dev";
     
-    // Class mapping for Google Classroom navigation
+    // Custom internal shortcuts (e.g., Google Classroom)
     const CLASSROOM_ROUTES = {
       "math": "https://classroom.google.com/u/0/c/MjcxOTM4",
       "physics": "https://classroom.google.com/u/0/c/Mzg0OTI1",
@@ -456,72 +456,78 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Opens YouTube search directly in a new tab
-    function playMediaTrack(query) {
-      const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-      window.open(targetUrl, '_blank');
-    }
+    // Universal URL & Search Resolver (Prevents broken relative routes)
+    function openUniversalUrl(rawTarget) {
+      if (!rawTarget) return;
+      let target = rawTarget.trim().replace(/\/+$/, '');
 
-    // Unified Command Processor & Tag Stripper
-    // Robust Command Processor & Navigation Fix
-function processAndCleanReply(text) {
-  let cleaned = text;
+      // 1. YouTube Handle (e.g., "@mrbeast")
+      if (target.startsWith('@')) {
+        window.open(`https://www.youtube.com/${target}`, '_blank');
+        return;
+      }
 
-  // 1. Process PLAY_MEDIA tag
-  const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
-  if (playMatch) {
-    const query = playMatch[1].trim();
-    playMediaTrack(query);
-    cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
-  }
+      // 2. Full HTTP/HTTPS URLs (e.g., "https://www.youtube.com/@mrbeast")
+      if (/^https?:\/\//i.test(target)) {
+        window.open(target, '_blank');
+        return;
+      }
 
-  // 2. Process NAVIGATE tag
-  const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-  if (navMatch) {
-    let target = navMatch[1].trim();
+      // 3. Valid Web Domains with optional paths (e.g., "youtube.com/@mrbeast", "google.com")
+      if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/i.test(target)) {
+        window.open(`https://${target}`, '_blank');
+        return;
+      }
 
-    // Only navigate if PLAY_MEDIA didn't already launch YouTube search
-    if (!playMatch) {
-      // Handle Google Classroom routes
-      if (target.toLowerCase().includes("classroom")) {
-        let opened = false;
-        for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
-          if (target.toLowerCase().includes(className)) {
+      // 4. Custom Local Routes (e.g., Google Classroom mapping)
+      if (typeof CLASSROOM_ROUTES !== 'undefined') {
+        const lowerTarget = target.toLowerCase();
+        for (const [key, url] of Object.entries(CLASSROOM_ROUTES)) {
+          if (lowerTarget.includes(key)) {
             window.open(url, '_blank');
-            opened = true;
-            break;
+            return;
           }
         }
-        if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
-      } else {
-        let finalUrl = target;
-
-        // If target is ONLY "youtube" or "youtube.com", go to homepage
-        if (/^youtube(\.com)?\/?$/i.test(target)) {
-          finalUrl = "https://www.youtube.com";
-        } 
-        // Handle channel handles (e.g. "@mrbeast")
-        else if (target.startsWith("@")) {
-          finalUrl = `https://www.youtube.com/${target}`;
-        }
-        // Ensure standard protocol for specific web addresses/channels
-        else if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-          finalUrl = `https://${finalUrl}`;
-        }
-
-        window.open(finalUrl, '_blank');
       }
+
+      // 5. Universal Fallback: Convert any query/shorthand (e.g. "youtube_mrbeast") into a YouTube search
+      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`, '_blank');
     }
-    cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
-  }
 
-  // 3. Clean remaining control tags
-  cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
-  cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
-  cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
+    function playMediaTrack(query) {
+      openUniversalUrl(query);
+    }
 
-  return cleaned.trim();
-}
+    // Tag Processor & Cleaner
+    function processAndCleanReply(text) {
+      let cleaned = text;
+
+      // Process PLAY_MEDIA tag
+      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
+      if (playMatch) {
+        const query = playMatch[1].trim();
+        openUniversalUrl(query);
+        cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
+      }
+
+      // Process NAVIGATE tag
+      const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
+      if (navMatch) {
+        const target = navMatch[1].trim();
+        if (!playMatch) {
+          openUniversalUrl(target);
+        }
+        cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+      }
+
+      // Strip remaining control tags from speech & interface display
+      cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+      cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
+      cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
+
+      return cleaned.trim();
+    }
+
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
@@ -645,7 +651,7 @@ function processAndCleanReply(text) {
 
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
 
-          // Reject short noise triggers (e.g. keyboard clicks)
+          // Reject brief triggers/clicks under 3 characters
           if (transcript.length < 3) return;
 
           isProcessing = true;
