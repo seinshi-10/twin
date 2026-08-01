@@ -11,8 +11,8 @@
   <style>
     :root {
       --bg: #03070d;
-      --panel: rgba(8, 16, 28, 0.6);
-      --panel-border: rgba(0, 243, 255, 0.12);
+      --panel: rgba(8, 16, 28, 0.65);
+      --panel-border: rgba(0, 243, 255, 0.15);
       --cyan: #00f3ff;
       --cyan-glow: rgba(0, 243, 255, 0.35);
       --text: #e0f7fc;
@@ -115,8 +115,8 @@
     }
 
     .jarvis-core-wrap {
-      width: 180px;
-      height: 180px;
+      width: 170px;
+      height: 170px;
       position: relative;
       display: flex;
       justify-content: center;
@@ -164,14 +164,33 @@
     @keyframes rotateRing { 100% { transform: rotate(360deg); } }
     @keyframes rotateRingRev { 100% { transform: rotate(-360deg); } }
 
-    .subtitle-box {
-      margin-top: 30px;
+    /* EMBEDDED MEDIA PLAYER STYLES */
+    .media-container {
       width: 100%;
-      min-height: 56px;
+      height: 180px;
+      margin-top: 15px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      display: none;
+      background: #000;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+    }
+
+    .media-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .subtitle-box {
+      margin-top: 20px;
+      width: 100%;
+      min-height: 54px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 16px;
-      padding: 14px 18px;
+      padding: 12px 16px;
       font-size: 0.82rem;
       line-height: 1.5;
       color: var(--text);
@@ -334,6 +353,9 @@
     .ctrl-btn.off { border-color: var(--danger); color: var(--danger); }
     .ctrl-btn.end { background: var(--danger); border-color: var(--danger); color: #fff; }
   </style>
+  
+  <!-- YOUTUBE IFRAME API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
@@ -346,7 +368,7 @@
       </div>
     </div>
 
-    <!-- MAIN HOME SCREEN -->
+    <!-- MAIN HOME -->
     <div id="screen-main" class="screen active">
       <div class="core-viewport">
         <div class="jarvis-core-wrap" id="mainCore">
@@ -354,6 +376,12 @@
           <div class="ring ring-mid"></div>
           <div class="ring ring-inner"></div>
         </div>
+
+        <!-- Embedded YouTube Player Container -->
+        <div class="media-container" id="mediaContainer">
+          <div id="yt-player"></div>
+        </div>
+
         <div class="subtitle-box" id="mainSubtitle">
           "At your service, Sir."
         </div>
@@ -427,6 +455,43 @@
     let isCamOn = true;
     let systemVoices = [];
 
+    // YOUTUBE IFRAME INTEGRATION
+    let ytPlayer = null;
+    let isPlayerReady = false;
+
+    function onYouTubeIframeAPIReady() {
+      ytPlayer = new YT.Player('yt-player', {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+          'autoplay': 1,
+          'controls': 1,
+          'modestbranding': 1,
+          'rel': 0
+        },
+        events: {
+          'onReady': () => { isPlayerReady = true; }
+        }
+      });
+    }
+
+    function playYouTubeVideoId(videoId) {
+      document.getElementById('mediaContainer').style.display = 'block';
+      if (ytPlayer && isPlayerReady && ytPlayer.loadVideoById) {
+        ytPlayer.loadVideoById(videoId);
+        ytPlayer.playVideo();
+      } else {
+        setTimeout(() => playYouTubeVideoId(videoId), 500);
+      }
+    }
+
+    function setAppVolume(percent) {
+      if (ytPlayer && isPlayerReady && ytPlayer.setVolume) {
+        ytPlayer.setVolume(percent);
+      }
+    }
+
+    // TTS VOICE INITIALIZATION
     function initSpeech() {
       if ('speechSynthesis' in window) {
         systemVoices = window.speechSynthesis.getVoices();
@@ -448,66 +513,52 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Universal URL Resolver & Website Launcher
     function openUniversalUrl(rawTarget) {
       if (!rawTarget) return;
       let target = rawTarget.trim().replace(/\/+$/, '');
 
-      // 1. YouTube Handle (e.g. "@mrbeast")
       if (target.startsWith('@')) {
         window.open(`https://www.youtube.com/${target}`, '_blank');
         return;
       }
 
-      // 2. Full HTTP/HTTPS URLs (e.g. "https://www.youtube.com/watch?v=...")
       if (/^https?:\/\//i.test(target)) {
         window.open(target, '_blank');
         return;
       }
 
-      // 3. Single-word site shortcuts (e.g. "youtube", "google", "github")
       if (!target.includes('.') && !target.includes(' ')) {
         window.open(`https://www.${target}.com`, '_blank');
         return;
       }
 
-      // 4. Web Domains with paths (e.g. "github.com/user")
-      if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/i.test(target)) {
-        window.open(`https://${target}`, '_blank');
-        return;
-      }
-
-      // 5. Generic Search Fallback
-      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`, '_blank');
+      window.open(`https://${target}`, '_blank');
     }
 
-    // Tag Processor & Command Cleaner
+    // ACTION TAG PARSER & CLEANER
     function processAndCleanReply(text) {
       let cleaned = text;
 
-      // Handle NAVIGATE tag (Also handles converted PLAY_MEDIA links from worker)
+      // 1. Play video directly inside app using YouTube iFrame API
+      const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
+      if (videoIdMatch) {
+        playYouTubeVideoId(videoIdMatch[1]);
+      }
+
+      // 2. Open standard web pages if explicitly asked
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-      if (navMatch) {
-        const target = navMatch[1].trim();
-        openUniversalUrl(target);
-        cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+      if (navMatch && !videoIdMatch) {
+        openUniversalUrl(navMatch[1].trim());
       }
 
-      // Handle PLAY_MEDIA fallback if worker did not resolve URL
-      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
-      if (playMatch) {
-        const query = playMatch[1].trim();
-        openUniversalUrl(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`);
-        cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
-      }
-
-      // Handle SET_VOLUME tag
-      const volMatch = cleaned.match(/\[\[SET_VOLUME:\s*(.*?)\]\]/i);
+      // 3. Set volume directly inside app
+      const volMatch = cleaned.match(/\[\[SET_VOLUME:\s*(\d+)\]\]/i);
       if (volMatch) {
-        const level = volMatch[1].trim();
-        console.log(`Setting media volume level: ${level}%`);
-        cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+        setAppVolume(parseInt(volMatch[1], 10));
       }
+
+      // 4. Clean all control tags so raw code NEVER shows in the chat UI
+      cleaned = cleaned.replace(/\[\[[A-Z_]+:\s*.*?\]\]/gi, '');
 
       return cleaned.trim();
     }
