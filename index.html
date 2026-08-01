@@ -523,33 +523,33 @@
 
     // Tag Processor & Cleaner
     function processAndCleanReply(text) {
-      let cleaned = text;
+  let cleaned = text;
 
-      // Process PLAY_MEDIA tag
-      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
-      if (playMatch) {
-        const query = playMatch[1].trim();
-        playMediaTrack(query);
-        cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
-      }
+  // Process PLAY_MEDIA tag (Worker will have converted query into direct watch URL)
+  const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
+  if (playMatch) {
+    const targetUrl = playMatch[1].trim();
+    openUniversalUrl(targetUrl);
+    cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
+  }
 
-      // Process NAVIGATE tag
-      const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-      if (navMatch) {
-        const target = navMatch[1].trim();
-        if (!playMatch) {
-          openUniversalUrl(target);
-        }
-        cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
-      }
-
-      // Strip control tags from UI & speech output
-      cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
-      cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
-      cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
-
-      return cleaned.trim();
+  // Process NAVIGATE tag
+  const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
+  if (navMatch) {
+    const target = navMatch[1].trim();
+    if (!playMatch) {
+      openUniversalUrl(target);
     }
+    cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+  }
+
+  // Strip remaining control tags
+  cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+  cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
+  cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
+
+  return cleaned.trim();
+}
 
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
