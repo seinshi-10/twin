@@ -458,7 +458,7 @@
 
     // Opens YouTube search directly in a new tab
     function playMediaTrack(query) {
-      const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      const targetUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1`;
       window.open(targetUrl, '_blank');
     }
 
