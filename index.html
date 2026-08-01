@@ -418,7 +418,6 @@
   <script>
     const WORKER_URL = "https://twin-proxy.tazabaevmaman07.workers.dev";
     
-    // Custom internal shortcuts (e.g., Google Classroom)
     const CLASSROOM_ROUTES = {
       "math": "https://classroom.google.com/u/0/c/MjcxOTM4",
       "physics": "https://classroom.google.com/u/0/c/Mzg0OTI1",
@@ -456,30 +455,58 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Universal URL & Search Resolver (Prevents broken relative routes)
+    // Direct Video Playback Fetcher
+    async function playMediaTrack(query) {
+      try {
+        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=all`);
+        const data = await res.json();
+        
+        if (data.items && data.items.length > 0) {
+          const topVideo = data.items.find(item => item.type === 'stream');
+          if (topVideo && topVideo.url) {
+            const videoId = topVideo.url.replace('/watch?v=', '');
+            window.open(`https://www.youtube.com/watch?v=${videoId}&autoplay=1`, '_blank');
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Direct video lookup failed, falling back to search", err);
+      }
+      
+      // Fallback to standard search if video lookup fails
+      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, '_blank');
+    }
+
+    // Universal URL & Navigation Resolver
     function openUniversalUrl(rawTarget) {
       if (!rawTarget) return;
       let target = rawTarget.trim().replace(/\/+$/, '');
 
-      // 1. YouTube Handle (e.g., "@mrbeast")
+      // 1. YouTube Handle (e.g. "@mrbeast")
       if (target.startsWith('@')) {
         window.open(`https://www.youtube.com/${target}`, '_blank');
         return;
       }
 
-      // 2. Full HTTP/HTTPS URLs (e.g., "https://www.youtube.com/@mrbeast")
+      // 2. Full HTTP/HTTPS URLs (e.g. "https://www.youtube.com")
       if (/^https?:\/\//i.test(target)) {
         window.open(target, '_blank');
         return;
       }
 
-      // 3. Valid Web Domains with optional paths (e.g., "youtube.com/@mrbeast", "google.com")
+      // 3. Single-word site shortcuts (e.g. "youtube", "google", "github")
+      if (!target.includes('.') && !target.includes(' ')) {
+        window.open(`https://www.${target}.com`, '_blank');
+        return;
+      }
+
+      // 4. Web Domains with paths (e.g. "youtube.com/@mrbeast", "github.com/user")
       if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/i.test(target)) {
         window.open(`https://${target}`, '_blank');
         return;
       }
 
-      // 4. Custom Local Routes (e.g., Google Classroom mapping)
+      // 5. Custom internal routes (e.g. Google Classroom)
       if (typeof CLASSROOM_ROUTES !== 'undefined') {
         const lowerTarget = target.toLowerCase();
         for (const [key, url] of Object.entries(CLASSROOM_ROUTES)) {
@@ -490,12 +517,8 @@
         }
       }
 
-      // 5. Universal Fallback: Convert any query/shorthand (e.g. "youtube_mrbeast") into a YouTube search
+      // 6. Generic Search Fallback
       window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`, '_blank');
-    }
-
-    function playMediaTrack(query) {
-      openUniversalUrl(query);
     }
 
     // Tag Processor & Cleaner
@@ -506,7 +529,7 @@
       const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
       if (playMatch) {
         const query = playMatch[1].trim();
-        openUniversalUrl(query);
+        playMediaTrack(query);
         cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
       }
 
@@ -520,7 +543,7 @@
         cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
       }
 
-      // Strip remaining control tags from speech & interface display
+      // Strip control tags from UI & speech output
       cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
       cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
       cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
@@ -651,7 +674,6 @@
 
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
 
-          // Reject brief triggers/clicks under 3 characters
           if (transcript.length < 3) return;
 
           isProcessing = true;
