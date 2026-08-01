@@ -115,8 +115,8 @@
     }
 
     .jarvis-core-wrap {
-      width: 160px;
-      height: 160px;
+      width: 180px;
+      height: 180px;
       position: relative;
       display: flex;
       justify-content: center;
@@ -164,37 +164,16 @@
     @keyframes rotateRing { 100% { transform: rotate(360deg); } }
     @keyframes rotateRingRev { 100% { transform: rotate(-360deg); } }
 
-    /* Media HUD Component */
-    .media-hud {
-      width: 100%;
-      height: 140px;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 16px;
-      margin-top: 15px;
-      display: none;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
-    }
-    .media-hud.active { display: flex; }
-
-    #mediaPlayer {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
     .subtitle-box {
-      margin-top: 15px;
+      margin-top: 30px;
       width: 100%;
-      min-height: 50px;
+      min-height: 56px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 16px;
-      padding: 12px 16px;
-      font-size: 0.8rem;
-      line-height: 1.4;
+      padding: 14px 18px;
+      font-size: 0.82rem;
+      line-height: 1.5;
       color: var(--text);
       text-align: center;
       backdrop-filter: blur(10px);
@@ -254,6 +233,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 1rem;
     }
 
     .chat-feed {
@@ -366,7 +346,7 @@
       </div>
     </div>
 
-    <!-- MAIN SCREEN -->
+    <!-- MAIN HOME -->
     <div id="screen-main" class="screen active">
       <div class="core-viewport">
         <div class="jarvis-core-wrap" id="mainCore">
@@ -374,14 +354,8 @@
           <div class="ring ring-mid"></div>
           <div class="ring ring-inner"></div>
         </div>
-
-        <!-- Embedded Media HUD for direct playback & control -->
-        <div class="media-hud" id="mediaHud">
-          <div id="mediaPlayer"></div>
-        </div>
-
         <div class="subtitle-box" id="mainSubtitle">
-          "System ready, Sir. Media playback and classroom navigation loaded."
+          "At your service, Sir."
         </div>
       </div>
 
@@ -441,13 +415,10 @@
     </div>
   </div>
 
-  <!-- YouTube IFrame API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
-
   <script>
     const WORKER_URL = "https://twin-proxy.tazabaevmaman07.workers.dev";
     
-    // Class Mapping Configuration (Update these URLs to your specific class links)
+    // Class mapping for Google Classroom navigation
     const CLASSROOM_ROUTES = {
       "math": "https://classroom.google.com/u/0/c/MjcxOTM4",
       "physics": "https://classroom.google.com/u/0/c/Mzg0OTI1",
@@ -455,7 +426,6 @@
       "general": "https://classroom.google.com"
     };
 
-    let ytPlayer = null;
     let chatHistory = [];
     let isCallActive = false;
     let isProcessing = false;
@@ -464,10 +434,6 @@
     let isMicOn = true;
     let isCamOn = true;
     let systemVoices = [];
-
-    function onYouTubeIframeAPIReady() {
-      console.log("YouTube API Ready.");
-    }
 
     function initSpeech() {
       if ('speechSynthesis' in window) {
@@ -490,97 +456,64 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Advanced Command Parser (Media, Volume, Quality, Deep Navigation)
-    function executeJarvisCommands(text) {
+    // Opens YouTube search directly in a new tab
+    function playMediaTrack(query) {
+      const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      window.open(targetUrl, '_blank');
+    }
+
+    // Unified Command Processor & Tag Stripper
+    function processAndCleanReply(text) {
       let cleaned = text;
 
-      // 1. DIRECT MEDIA PLAYBACK COMMAND
-      const playMatch = text.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
+      // 1. Process PLAY_MEDIA tag
+      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
       if (playMatch) {
         const query = playMatch[1].trim();
         playMediaTrack(query);
         cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
       }
 
-      // 2. VOLUME CONTROL COMMAND
-      const volMatch = text.match(/\[\[SET_VOLUME:\s*(\d+)\]\]/i);
-      if (volMatch) {
-        const volumeLevel = parseInt(volMatch[1], 10);
-        if (ytPlayer && ytPlayer.setVolume) {
-          ytPlayer.setVolume(volumeLevel);
-        }
-        cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
-      }
-
-      // 3. QUALITY CONTROL COMMAND
-      const qualityMatch = text.match(/\[\[SET_QUALITY:\s*(.*?)\]\]/i);
-      if (qualityMatch) {
-        const quality = qualityMatch[1].trim();
-        if (ytPlayer && ytPlayer.setPlaybackQuality) {
-          ytPlayer.setPlaybackQuality(quality);
-        }
-        cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
-      }
-
-      // 4. MEDIA PAUSE / PLAY
-      const ctrlMatch = text.match(/\[\[MEDIA_CONTROL:\s*(.*?)\]\]/i);
-      if (ctrlMatch) {
-        const action = ctrlMatch[1].trim().toLowerCase();
-        if (ytPlayer) {
-          if (action === 'pause') ytPlayer.pauseVideo();
-          if (action === 'play') ytPlayer.playVideo();
-        }
-        cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
-      }
-
-      // 5. DEEP NAVIGATION & CLASSROOM ROUTING
-      const navMatch = text.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
+      // 2. Process NAVIGATE tag (Handles YouTube, Google Classroom, and General URLs)
+      const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
       if (navMatch) {
         const target = navMatch[1].trim().toLowerCase();
         
-        if (target.includes("classroom")) {
-          let opened = false;
-          for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
-            if (target.includes(className)) {
-              window.open(url, '_blank');
-              opened = true;
-              break;
+        // Prevent opening duplicate tabs if PLAY_MEDIA was already triggered
+        if (!playMatch || !target.includes("youtube")) {
+          if (target.includes("classroom")) {
+            let opened = false;
+            for (const [className, url] of Object.entries(CLASSROOM_ROUTES)) {
+              if (target.includes(className)) {
+                window.open(url, '_blank');
+                opened = true;
+                break;
+              }
             }
+            if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
+          } else if (target.includes("youtube")) {
+            window.open("https://www.youtube.com", "_blank");
+          } else {
+            window.open(target.startsWith('http') ? target : `https://${target}`, '_blank');
           }
-          if (!opened) window.open(CLASSROOM_ROUTES["general"], '_blank');
-        } else {
-          window.open(target.startsWith('http') ? target : `https://${target}`, '_blank');
         }
         cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
       }
 
+      // 3. Process volume, quality, and control tags (strips them from output)
+      cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+      cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
+      cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
+
       return cleaned.trim();
-    }
-
-    // Play YouTube video programmatically inside the HUD
-    function playMediaTrack(query) {
-      const mediaHud = document.getElementById('mediaHud');
-      mediaHud.classList.add('active');
-
-      // Uses YouTube Embed search parameter for direct autoplay
-      const embedUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1&enablejsapi=1`;
-      
-      document.getElementById('mediaPlayer').innerHTML = `<iframe id="ytIframe" width="100%" height="100%" src="${embedUrl}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-
-      setTimeout(() => {
-        if (window.YT && window.YT.Player) {
-          ytPlayer = new YT.Player('ytIframe');
-        }
-      }, 1000);
     }
 
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
       window.speechSynthesis.cancel();
-      const cleanText = executeJarvisCommands(text);
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const utterance = new SpeechSynthesisUtterance(text);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
       const britishVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('George'))) 
                         || voices.find(v => v.lang === 'en-GB')
@@ -639,10 +572,12 @@
       const mainCore = document.getElementById('mainCore');
       mainCore.classList.add('speaking');
 
-      const reply = await requestAI(text);
-      appendChatMessage(reply, 'bot');
-      document.getElementById('mainSubtitle').textContent = `"${reply}"`;
-      speakJARVIS(reply, mainCore);
+      const rawReply = await requestAI(text);
+      const cleanReply = processAndCleanReply(rawReply);
+
+      appendChatMessage(cleanReply, 'bot');
+      document.getElementById('mainSubtitle').textContent = `"${cleanReply}"`;
+      speakJARVIS(cleanReply, mainCore);
     }
 
     function appendChatMessage(text, sender) {
@@ -673,7 +608,11 @@
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ 
           video: true, 
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
         });
         document.getElementById('userCamera').srcObject = mediaStream;
       } catch (e) {
@@ -691,6 +630,8 @@
           if (!isCallActive || isProcessing) return;
 
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
+
+          // Reject short noise triggers (e.g. keyboard clicks)
           if (transcript.length < 3) return;
 
           isProcessing = true;
@@ -699,10 +640,11 @@
           const callCore = document.getElementById('callCore');
           const snapshot = captureCameraSnapshot();
 
-          const reply = await requestAI(transcript, snapshot);
+          const rawReply = await requestAI(transcript, snapshot);
+          const cleanReply = processAndCleanReply(rawReply);
           
-          document.getElementById('callSubtitle').textContent = `JARVIS: "${reply}"`;
-          speakJARVIS(reply, callCore);
+          document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
+          speakJARVIS(cleanReply, callCore);
         };
 
         recognition.onend = () => {
