@@ -346,7 +346,7 @@
       </div>
     </div>
 
-    <!-- MAIN HOME -->
+    <!-- MAIN HOME SCREEN -->
     <div id="screen-main" class="screen active">
       <div class="core-viewport">
         <div class="jarvis-core-wrap" id="mainCore">
@@ -418,13 +418,6 @@
   <script>
     const WORKER_URL = "https://twin-proxy.tazabaevmaman07.workers.dev";
     
-    const CLASSROOM_ROUTES = {
-      "math": "https://classroom.google.com/u/0/c/MjcxOTM4",
-      "physics": "https://classroom.google.com/u/0/c/Mzg0OTI1",
-      "english": "https://classroom.google.com/u/0/c/NDk1ODE1",
-      "general": "https://classroom.google.com"
-    };
-
     let chatHistory = [];
     let isCallActive = false;
     let isProcessing = false;
@@ -455,29 +448,7 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    // Direct Video Playback Fetcher
-    async function playMediaTrack(query) {
-      try {
-        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=all`);
-        const data = await res.json();
-        
-        if (data.items && data.items.length > 0) {
-          const topVideo = data.items.find(item => item.type === 'stream');
-          if (topVideo && topVideo.url) {
-            const videoId = topVideo.url.replace('/watch?v=', '');
-            window.open(`https://www.youtube.com/watch?v=${videoId}&autoplay=1`, '_blank');
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn("Direct video lookup failed, falling back to search", err);
-      }
-      
-      // Fallback to standard search if video lookup fails
-      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, '_blank');
-    }
-
-    // Universal URL & Navigation Resolver
+    // Universal URL Resolver & Website Launcher
     function openUniversalUrl(rawTarget) {
       if (!rawTarget) return;
       let target = rawTarget.trim().replace(/\/+$/, '');
@@ -488,7 +459,7 @@
         return;
       }
 
-      // 2. Full HTTP/HTTPS URLs (e.g. "https://www.youtube.com")
+      // 2. Full HTTP/HTTPS URLs (e.g. "https://www.youtube.com/watch?v=...")
       if (/^https?:\/\//i.test(target)) {
         window.open(target, '_blank');
         return;
@@ -500,56 +471,46 @@
         return;
       }
 
-      // 4. Web Domains with paths (e.g. "youtube.com/@mrbeast", "github.com/user")
+      // 4. Web Domains with paths (e.g. "github.com/user")
       if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/.*)?$/i.test(target)) {
         window.open(`https://${target}`, '_blank');
         return;
       }
 
-      // 5. Custom internal routes (e.g. Google Classroom)
-      if (typeof CLASSROOM_ROUTES !== 'undefined') {
-        const lowerTarget = target.toLowerCase();
-        for (const [key, url] of Object.entries(CLASSROOM_ROUTES)) {
-          if (lowerTarget.includes(key)) {
-            window.open(url, '_blank');
-            return;
-          }
-        }
-      }
-
-      // 6. Generic Search Fallback
+      // 5. Generic Search Fallback
       window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`, '_blank');
     }
 
-    // Tag Processor & Cleaner
+    // Tag Processor & Command Cleaner
     function processAndCleanReply(text) {
-  let cleaned = text;
+      let cleaned = text;
 
-  // Process PLAY_MEDIA tag (Worker will have converted query into direct watch URL)
-  const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
-  if (playMatch) {
-    const targetUrl = playMatch[1].trim();
-    openUniversalUrl(targetUrl);
-    cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
-  }
+      // Handle NAVIGATE tag (Also handles converted PLAY_MEDIA links from worker)
+      const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
+      if (navMatch) {
+        const target = navMatch[1].trim();
+        openUniversalUrl(target);
+        cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
+      }
 
-  // Process NAVIGATE tag
-  const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-  if (navMatch) {
-    const target = navMatch[1].trim();
-    if (!playMatch) {
-      openUniversalUrl(target);
+      // Handle PLAY_MEDIA fallback if worker did not resolve URL
+      const playMatch = cleaned.match(/\[\[PLAY_MEDIA:\s*(.*?)\]\]/i);
+      if (playMatch) {
+        const query = playMatch[1].trim();
+        openUniversalUrl(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`);
+        cleaned = cleaned.replace(/\[\[PLAY_MEDIA:.*?\]\]/gi, '');
+      }
+
+      // Handle SET_VOLUME tag
+      const volMatch = cleaned.match(/\[\[SET_VOLUME:\s*(.*?)\]\]/i);
+      if (volMatch) {
+        const level = volMatch[1].trim();
+        console.log(`Setting media volume level: ${level}%`);
+        cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
+      }
+
+      return cleaned.trim();
     }
-    cleaned = cleaned.replace(/\[\[NAVIGATE:.*?\]\]/gi, '');
-  }
-
-  // Strip remaining control tags
-  cleaned = cleaned.replace(/\[\[SET_VOLUME:.*?\]\]/gi, '');
-  cleaned = cleaned.replace(/\[\[SET_QUALITY:.*?\]\]/gi, '');
-  cleaned = cleaned.replace(/\[\[MEDIA_CONTROL:.*?\]\]/gi, '');
-
-  return cleaned.trim();
-}
 
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
