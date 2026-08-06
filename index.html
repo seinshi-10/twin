@@ -561,6 +561,14 @@
   isCallActive = true;
   openScreen('screen-call');
 
+  // Unlock Chrome speech audio on user gesture
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.resume();
+    const silentUtterance = new SpeechSynthesisUtterance("");
+    silentUtterance.volume = 0;
+    window.speechSynthesis.speak(silentUtterance);
+  }
+
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ 
       video: true, 
@@ -586,11 +594,9 @@
       if (!isCallActive || isProcessing || window.speechSynthesis.speaking) return;
 
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      if (transcript.length < 3) return;
+      if (transcript.length < 2) return;
 
       isProcessing = true;
-
-      // Immediately stop mic while processing AI response
       try { recognition.stop(); } catch(e){}
 
       document.getElementById('callSubtitle').textContent = `USR: "${transcript}"`;
@@ -600,13 +606,12 @@
 
       const rawReply = await requestAI(transcript, snapshot);
       const cleanReply = processAndCleanReply(rawReply);
-      
+
       document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
       speakJARVIS(cleanReply, callCore);
     };
 
     recognition.onend = () => {
-      // Only restart if call is active, mic is enabled, and JARVIS is NOT currently talking
       if (isCallActive && isMicOn && !isProcessing && !window.speechSynthesis.speaking) {
         try { recognition.start(); } catch(e){}
       }
@@ -615,7 +620,6 @@
     try { recognition.start(); } catch(e){}
   }
 }
-
     function toggleMic() {
       if (mediaStream) {
         isMicOn = !isMicOn;
