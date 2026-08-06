@@ -430,6 +430,9 @@
     let lastSpokenReply = "";     // last thing JARVIS said, for echo detection
     let speakingCooldownUntil = 0; // timestamp (ms) until which incoming results are ignored
     const MIC_COOLDOWN_MS = 700;   // buffer after TTS ends before results are trusted again
+    let speechBuffer = "";         // NEW: accumulates transcript fragments across pauses
+    let silenceTimer = null;       // NEW: debounce handle — finalizes speech after a real pause
+    const SILENCE_DEBOUNCE_MS = 1000; // NEW: how long to wait after last word before treating speech as done
     let systemVoices = [];
 
     // NEW: crude similarity check — normalizes and compares word overlap.
@@ -527,6 +530,8 @@
 
       isSpeaking = true;
       lastSpokenReply = text;
+      speechBuffer = "";
+      if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
@@ -642,17 +647,17 @@
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
-        recognition.interimResults = false;
+        recognition.interimResults = true; // NEW: needed so we can see speech is still ongoing
         recognition.lang = 'en-US';
 
-        recognition.onresult = async (event) => {
+        // NEW: takes whatever accumulated in speechBuffer and sends it as one command,
+        // called only after SILENCE_DEBOUNCE_MS of no new speech (a real pause).
+        async function finalizeSpeech() {
+          const transcript = speechBuffer.trim();
+          speechBuffer = "";
           if (!isCallActive || isProcessing || isSpeaking || Date.now() < speakingCooldownUntil) return;
+          if (!transcript || transcript.length < 3) return;
 
-          const transcript = event.results[event.results.length - 1][0].transcript.trim();
-
-          if (transcript.length < 3) return;
-
-          // if this looks like JARVIS hearing its own last reply, ignore it
           if (isLikelyEcho(transcript)) {
             console.log('Ignored likely echo:', transcript);
             return;
@@ -666,9 +671,38 @@
 
           const rawReply = await requestAI(transcript, snapshot);
           const cleanReply = processAndCleanReply(rawReply);
-          
+
           document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
           speakJARVIS(cleanReply, callCore);
+        }
+
+        recognition.onresult = (event) => {
+          if (!isCallActive || isProcessing || isSpeaking || Date.now() < speakingCooldownUntil) return;
+
+          // Rebuild transcript from this event's results, keeping interim + final text separate
+          let finalChunk = '';
+          let interimChunk = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const chunkText = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalChunk += chunkText + ' ';
+            } else {
+              interimChunk += chunkText;
+            }
+          }
+
+          if (finalChunk) speechBuffer += finalChunk;
+
+          // Show live progress (buffered so far + whatever's still being recognized)
+          const livePreview = (speechBuffer + interimChunk).trim();
+          if (livePreview) {
+            document.getElementById('callSubtitle').textContent = `USR: "${livePreview}"`;
+          }
+
+          // Any new speech (even interim) resets the silence timer — only a real
+          // pause of SILENCE_DEBOUNCE_MS should finalize the command.
+          if (silenceTimer) clearTimeout(silenceTimer);
+          silenceTimer = setTimeout(finalizeSpeech, SILENCE_DEBOUNCE_MS);
         };
 
         recognition.onend = () => {
@@ -710,6 +744,8 @@
       isSpeaking = false;
       speakingCooldownUntil = 0;
       lastSpokenReply = "";
+      speechBuffer = "";
+      if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
       if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (mediaStream) {
