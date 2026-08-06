@@ -593,17 +593,78 @@
       feed.scrollTop = feed.scrollHeight;
     }
 
-    function captureCameraSnapshot() {
-      const video = document.getElementById('userCamera');
-      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
+    // UPGRADED SNAPSHOT RESOLUTION & QUALITY
+function captureCameraSnapshot() {
+  const video = document.getElementById('userCamera');
+  if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
 
-      const canvas = document.createElement('canvas');
-      canvas.width = 120;
-      canvas.height = 90;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg', 0.2);
+  const canvas = document.createElement('canvas');
+  // High enough resolution for vision model to analyze posture and background clearly
+  canvas.width = 480;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.7);
+}
+
+// ALWAYS ATTACH CAMERA FRAME IN TACTICAL MODE
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (event) => {
+    if (!isCallActive || isProcessing) return;
+
+    let fullTranscript = '';
+    for (let i = 0; i < event.results.length; i++) {
+      fullTranscript += event.results[i][0].transcript + ' ';
     }
+
+    const currentText = fullTranscript.trim();
+    if (currentText.length > 0) {
+      document.getElementById('callSubtitle').textContent = `USR: "${currentText}"`;
+    }
+
+    clearTimeout(speechSilenceTimeout);
+    speechSilenceTimeout = setTimeout(async () => {
+      if (!isCallActive || isProcessing) return;
+
+      if (currentText.length >= 2) {
+        isProcessing = true;
+        
+        try { recognition.abort(); } catch(e){}
+
+        const callCore = document.getElementById('callCore');
+        
+        // ALWAYS send snapshot when camera is active (removed visionKeywords filter)
+        const snapshot = (isCallActive && isCamOn) ? captureCameraSnapshot() : null;
+
+        const rawReply = await requestAI(currentText, snapshot);
+        const cleanReply = processAndCleanReply(rawReply);
+        
+        document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
+        speakJARVIS(cleanReply, callCore);
+      }
+    }, 1200);
+  };
+
+  recognition.onerror = (event) => {
+    if (event.error !== 'aborted') {
+      setTimeout(restartListening, 500);
+    }
+  };
+
+  recognition.onend = () => {
+    if (isCallActive && isMicOn && !isProcessing) {
+      setTimeout(restartListening, 300);
+    }
+  };
+}
 
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
