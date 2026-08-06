@@ -476,19 +476,16 @@
     function processAndCleanReply(text) {
       let cleaned = text;
 
-      // 1. Open video in a NEW tab
       const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
       if (videoIdMatch) {
         window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
       }
 
-      // 2. Open URL
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
       if (navMatch && !videoIdMatch) {
         openUniversalUrl(navMatch[1].trim());
       }
 
-      // 3. Clean tags and formatting
       cleaned = cleaned.replace(/\[\[.*?\]\]/gi, '');
       cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
       cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
@@ -498,13 +495,18 @@
     }
 
     function speakJARVIS(text, coreElement) {
-      if (!('speechSynthesis' in window)) return;
+      if (!('speechSynthesis' in window)) {
+        isProcessing = false;
+        setTimeout(restartListening, 300);
+        return;
+      }
 
-      window.speechSynthesis.cancel(); // Clear previous speech queue
+      window.speechSynthesis.cancel();
 
       const spokenText = text.replace(/JARVIS:/gi, '').replace(/[\*\#\`\_]/g, '').trim();
       if (!spokenText) {
         isProcessing = false;
+        setTimeout(restartListening, 300);
         return;
       }
 
@@ -521,17 +523,21 @@
 
       if (coreElement) coreElement.classList.add('speaking');
 
+      let hasFinished = false;
       const finishSpeech = () => {
+        if (hasFinished) return;
+        hasFinished = true;
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
-
-        if (isCallActive && isMicOn && recognition) {
-          try { recognition.start(); } catch(e){}
-        }
+        setTimeout(restartListening, 400);
       };
 
       utterance.onend = finishSpeech;
       utterance.onerror = finishSpeech;
+
+      // Watchdog timer to unstick speech processing if audio fails
+      const watchdogTime = Math.max(3000, spokenText.length * 120);
+      setTimeout(finishSpeech, watchdogTime);
 
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
@@ -589,7 +595,6 @@
       feed.scrollTop = feed.scrollHeight;
     }
 
-    // Ultra-lightweight snapshot (120x90 @ 0.2 quality) to avoid 429 TPM Rate Limits
     function captureCameraSnapshot() {
       const video = document.getElementById('userCamera');
       if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
@@ -602,8 +607,82 @@
       return canvas.toDataURL('image/jpeg', 0.2);
     }
 
+    // SELF-HEALING SPEECH RECOGNITION INSTANCE
+    function initSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        if (!isCallActive || isProcessing) return;
+
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript + ' ';
+        }
+
+        const currentText = fullTranscript.trim();
+        if (currentText.length > 0) {
+          document.getElementById('callSubtitle').textContent = `USR: "${currentText}"`;
+        }
+
+        clearTimeout(speechSilenceTimeout);
+        speechSilenceTimeout = setTimeout(async () => {
+          if (!isCallActive || isProcessing) return;
+
+          if (currentText.length >= 2) {
+            isProcessing = true;
+            
+            try { recognition.abort(); } catch(e){}
+
+            const callCore = document.getElementById('callCore');
+            const visionKeywords = ["see", "look", "view", "camera", "showing", "what is this", "describe", "who", "where"];
+            const needsVision = visionKeywords.some(kw => currentText.toLowerCase().includes(kw));
+            const snapshot = (needsVision && isCamOn) ? captureCameraSnapshot() : null;
+
+            const rawReply = await requestAI(currentText, snapshot);
+            const cleanReply = processAndCleanReply(rawReply);
+            
+            document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
+            speakJARVIS(cleanReply, callCore);
+          }
+        }, 1200);
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error !== 'aborted') {
+          setTimeout(restartListening, 500);
+        }
+      };
+
+      recognition.onend = () => {
+        if (isCallActive && isMicOn && !isProcessing) {
+          setTimeout(restartListening, 300);
+        }
+      };
+    }
+
+    function restartListening() {
+      if (!isCallActive || !isMicOn || isProcessing) return;
+      if (!recognition) initSpeechRecognition();
+
+      try {
+        recognition.start();
+      } catch (e) {
+        // Recreate recognition instance if browser speech engine is locked
+        try { recognition.abort(); } catch(err){}
+        initSpeechRecognition();
+        try { recognition.start(); } catch(err){}
+      }
+    }
+
     async function startCall() {
       isCallActive = true;
+      isProcessing = false;
       openScreen('screen-call');
 
       try {
@@ -620,59 +699,8 @@
         document.getElementById('callStatusText').textContent = "AUDIO_ONLY";
       }
 
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event) => {
-          if (!isCallActive || isProcessing) return;
-
-          let fullTranscript = '';
-          for (let i = 0; i < event.results.length; i++) {
-            fullTranscript += event.results[i][0].transcript + ' ';
-          }
-
-          const currentText = fullTranscript.trim();
-          if (currentText.length > 0) {
-            document.getElementById('callSubtitle').textContent = `USR: "${currentText}"`;
-          }
-
-          clearTimeout(speechSilenceTimeout);
-          speechSilenceTimeout = setTimeout(async () => {
-            if (!isCallActive || isProcessing) return;
-
-            if (currentText.length >= 3) {
-              isProcessing = true;
-              
-              try { recognition.stop(); } catch(e){}
-
-              const callCore = document.getElementById('callCore');
-
-              // Only send snapshot if vision intent is detected
-              const visionKeywords = ["see", "look", "view", "camera", "showing", "what is this", "describe", "who", "where"];
-              const needsVision = visionKeywords.some(kw => currentText.toLowerCase().includes(kw));
-              const snapshot = (needsVision && isCamOn) ? captureCameraSnapshot() : null;
-
-              const rawReply = await requestAI(currentText, snapshot);
-              const cleanReply = processAndCleanReply(rawReply);
-              
-              document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
-              speakJARVIS(cleanReply, callCore);
-            }
-          }, 1000);
-        };
-
-        recognition.onend = () => {
-          if (isCallActive && isMicOn && !isProcessing && recognition) {
-            try { recognition.start(); } catch(e){}
-          }
-        };
-
-        try { recognition.start(); } catch(e){}
-      }
+      initSpeechRecognition();
+      restartListening();
     }
 
     function toggleMic() {
@@ -680,9 +708,7 @@
         isMicOn = !isMicOn;
         mediaStream.getAudioTracks()[0].enabled = isMicOn;
         document.getElementById('btnMic').classList.toggle('off', !isMicOn);
-        if (recognition) {
-          if (isMicOn) { try { recognition.start(); } catch(e){} } else { recognition.stop(); }
-        }
+        if (isMicOn) { restartListening(); } else if (recognition) { recognition.abort(); }
       }
     }
 
@@ -699,7 +725,7 @@
       isCallActive = false;
       isProcessing = false;
       clearTimeout(speechSilenceTimeout);
-      if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+      if (recognition) { try { recognition.abort(); } catch(e){} recognition = null; }
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
