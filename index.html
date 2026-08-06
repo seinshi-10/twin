@@ -495,76 +495,46 @@
     }
 
     function speakJARVIS(text, coreElement) {
-      if (!('speechSynthesis' in window)) return;
+  if (!('speechSynthesis' in window)) return;
 
-      window.speechSynthesis.cancel();
+  window.speechSynthesis.cancel();
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
-      const britishVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('George'))) 
-                        || voices.find(v => v.lang === 'en-GB')
-                        || voices.find(v => v.lang.includes('en'));
+  // 1. Temporarily STOP listening so J.A.R.V.I.S. does not hear himself
+  if (recognition && isCallActive) {
+    try { recognition.stop(); } catch(e){}
+  }
 
-      if (britishVoice) utterance.voice = britishVoice;
-      utterance.rate = 1.0;
-      utterance.pitch = 0.95;
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
+  const britishVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('George'))) 
+                    || voices.find(v => v.lang === 'en-GB')
+                    || voices.find(v => v.lang.includes('en'));
 
-      if (coreElement) coreElement.classList.add('speaking');
+  if (britishVoice) utterance.voice = britishVoice;
+  utterance.rate = 1.0;
+  utterance.pitch = 0.95;
 
-      utterance.onend = () => {
-        if (coreElement) coreElement.classList.remove('speaking');
-        isProcessing = false;
-      };
+  if (coreElement) coreElement.classList.add('speaking');
 
-      utterance.onerror = () => {
-        if (coreElement) coreElement.classList.remove('speaking');
-        isProcessing = false;
-      };
+  const onSpeechFinished = () => {
+    if (coreElement) coreElement.classList.remove('speaking');
+    isProcessing = false;
 
-      window.speechSynthesis.speak(utterance);
+    // 2. Restart listening ONLY after speech finishes, with a 400ms buffer for echo dissipation
+    if (isCallActive && isMicOn) {
+      setTimeout(() => {
+        if (isCallActive && isMicOn && !window.speechSynthesis.speaking) {
+          try { recognition.start(); } catch(e){}
+        }
+      }, 400);
     }
+  };
 
-    async function requestAI(userPrompt, imageBase64 = null) {
-      chatHistory.push({ role: "user", content: userPrompt });
+  utterance.onend = onSpeechFinished;
+  utterance.onerror = onSpeechFinished;
 
-      try {
-        const recentMessages = chatHistory.slice(-4);
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: recentMessages, image: imageBase64 })
-        });
-
-        const data = await response.json();
-        const reply = data.reply || "At your service, Sir.";
-        chatHistory.push({ role: "assistant", content: reply });
-        return reply;
-      } catch (err) {
-        console.error(err);
-        isProcessing = false;
-        return "An anomaly occurred while processing your request, Sir.";
-      }
-    }
-
-    async function sendChatMessage() {
-      const input = document.getElementById('chatInput');
-      const text = input.value.trim();
-      if (!text || isProcessing) return;
-
-      isProcessing = true;
-      input.value = '';
-      appendChatMessage(text, 'user');
-
-      const mainCore = document.getElementById('mainCore');
-      mainCore.classList.add('speaking');
-
-      const rawReply = await requestAI(text);
-      const cleanReply = processAndCleanReply(rawReply);
-
-      appendChatMessage(cleanReply, 'bot');
-      document.getElementById('mainSubtitle').textContent = `"${cleanReply}"`;
-      speakJARVIS(cleanReply, mainCore);
-    }
+  window.speechSynthesis.speak(utterance);
+}
 
     function appendChatMessage(text, sender) {
       const feed = document.getElementById('chatFeed');
@@ -588,59 +558,63 @@
     }
 
     async function startCall() {
-      isCallActive = true;
-      openScreen('screen-call');
+  isCallActive = true;
+  openScreen('screen-call');
 
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          } 
-        });
-        document.getElementById('userCamera').srcObject = mediaStream;
-      } catch (e) {
-        document.getElementById('callStatusText').textContent = "AUDIO_ONLY";
-      }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ 
+      video: true, 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      } 
+    });
+    document.getElementById('userCamera').srcObject = mediaStream;
+  } catch (e) {
+    document.getElementById('callStatusText').textContent = "AUDIO_ONLY";
+  }
 
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
 
-        recognition.onresult = async (event) => {
-          if (!isCallActive || isProcessing) return;
+    recognition.onresult = async (event) => {
+      if (!isCallActive || isProcessing || window.speechSynthesis.speaking) return;
 
-          const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      if (transcript.length < 3) return;
 
-          if (transcript.length < 3) return;
+      isProcessing = true;
 
-          isProcessing = true;
-          document.getElementById('callSubtitle').textContent = `USR: "${transcript}"`;
+      // Immediately stop mic while processing AI response
+      try { recognition.stop(); } catch(e){}
 
-          const callCore = document.getElementById('callCore');
-          const snapshot = captureCameraSnapshot();
+      document.getElementById('callSubtitle').textContent = `USR: "${transcript}"`;
 
-          const rawReply = await requestAI(transcript, snapshot);
-          const cleanReply = processAndCleanReply(rawReply);
-          
-          document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
-          speakJARVIS(cleanReply, callCore);
-        };
+      const callCore = document.getElementById('callCore');
+      const snapshot = captureCameraSnapshot();
 
-        recognition.onend = () => {
-          if (isCallActive && isMicOn && recognition) {
-            try { recognition.start(); } catch(e){}
-          }
-        };
+      const rawReply = await requestAI(transcript, snapshot);
+      const cleanReply = processAndCleanReply(rawReply);
+      
+      document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
+      speakJARVIS(cleanReply, callCore);
+    };
 
+    recognition.onend = () => {
+      // Only restart if call is active, mic is enabled, and JARVIS is NOT currently talking
+      if (isCallActive && isMicOn && !isProcessing && !window.speechSynthesis.speaking) {
         try { recognition.start(); } catch(e){}
       }
-    }
+    };
+
+    try { recognition.start(); } catch(e){}
+  }
+}
 
     function toggleMic() {
       if (mediaStream) {
