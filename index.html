@@ -435,6 +435,21 @@
     const SILENCE_DEBOUNCE_MS = 1000; // NEW: how long to wait after last word before treating speech as done
     let systemVoices = [];
 
+    // NEW: safely (re)start recognition. If a previous stop() hasn't fully
+    // completed yet, start() throws InvalidStateError — retry shortly instead
+    // of silently failing (that silent failure was the earlier bug).
+    function safeStartRecognition() {
+      if (!recognition || !isCallActive || !isMicOn) return;
+      try {
+        recognition.start();
+      } catch (e) {
+        setTimeout(() => {
+          if (!recognition || !isCallActive || !isMicOn) return;
+          try { recognition.start(); } catch (e2) {}
+        }, 300);
+      }
+    }
+
     // NEW: crude similarity check — normalizes and compares word overlap.
     // If the new transcript is basically what JARVIS just said, it's an echo, not a command.
     function isLikelyEcho(transcript) {
@@ -532,6 +547,12 @@
       lastSpokenReply = text;
       speechBuffer = "";
       if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+      // Physically stop listening while JARVIS talks — flags alone weren't
+      // enough because STT results for a full sentence can keep arriving
+      // a second or more after the audio finishes playing.
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
@@ -550,6 +571,7 @@
         isProcessing = false;
         isSpeaking = false;
         speakingCooldownUntil = Date.now() + MIC_COOLDOWN_MS;
+        safeStartRecognition();
       };
 
       utterance.onerror = () => {
@@ -557,6 +579,7 @@
         isProcessing = false;
         isSpeaking = false;
         speakingCooldownUntil = Date.now() + MIC_COOLDOWN_MS;
+        safeStartRecognition();
       };
 
       window.speechSynthesis.speak(utterance);
@@ -706,15 +729,15 @@
         };
 
         recognition.onend = () => {
-          // With continuous mode, this normally only fires on an unexpected
-          // stop (browser silence timeout, network hiccup) since we no longer
-          // call recognition.stop() ourselves during TTS playback.
-          if (isCallActive && isMicOn && recognition) {
-            try { recognition.start(); } catch(e){}
+          // If we stopped it deliberately for TTS, don't restart here —
+          // utterance.onend handles restarting once JARVIS finishes talking.
+          if (isSpeaking) return;
+          if (isCallActive && isMicOn) {
+            safeStartRecognition();
           }
         };
 
-        try { recognition.start(); } catch(e){}
+        safeStartRecognition();
       }
     }
 
