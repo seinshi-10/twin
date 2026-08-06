@@ -426,6 +426,7 @@
     let recognition = null;
     let isMicOn = true;
     let isCamOn = true;
+    let isSpeaking = false; // NEW: tracks whether JARVIS's TTS is currently playing
     let systemVoices = [];
 
     // TTS VOICE INITIALIZATION
@@ -494,10 +495,17 @@
       return cleaned.trim();
     }
 
+    // UPDATED: stops mic before speaking, resumes it only after TTS ends
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
       window.speechSynthesis.cancel();
+
+      // Stop listening BEFORE JARVIS starts talking, so it can't hear itself
+      isSpeaking = true;
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
@@ -514,11 +522,22 @@
       utterance.onend = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
+        isSpeaking = false;
+
+        // Resume listening ONLY after JARVIS has finished talking
+        if (isCallActive && isMicOn && recognition) {
+          try { recognition.start(); } catch (e) {}
+        }
       };
 
       utterance.onerror = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
+        isSpeaking = false;
+
+        if (isCallActive && isMicOn && recognition) {
+          try { recognition.start(); } catch (e) {}
+        }
       };
 
       window.speechSynthesis.speak(utterance);
@@ -613,7 +632,8 @@
         recognition.lang = 'en-US';
 
         recognition.onresult = async (event) => {
-          if (!isCallActive || isProcessing) return;
+          // UPDATED: also ignore results while JARVIS is speaking
+          if (!isCallActive || isProcessing || isSpeaking) return;
 
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
 
@@ -633,7 +653,9 @@
         };
 
         recognition.onend = () => {
-          if (isCallActive && isMicOn && recognition) {
+          // UPDATED: don't auto-restart while JARVIS is speaking;
+          // speakJARVIS's onend/onerror will restart it instead
+          if (isCallActive && isMicOn && !isSpeaking && recognition) {
             try { recognition.start(); } catch(e){}
           }
         };
@@ -665,6 +687,7 @@
     function endCall() {
       isCallActive = false;
       isProcessing = false;
+      isSpeaking = false;
       if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (mediaStream) {
