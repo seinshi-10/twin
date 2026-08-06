@@ -427,9 +427,9 @@
     let isMicOn = true;
     let isCamOn = true;
     let isSpeaking = false; // tracks whether JARVIS's TTS is currently playing
-    let lastSpokenReply = "";  // NEW: last thing JARVIS said, for echo detection
-    let restartTimer = null;   // NEW: handle for the cooldown-before-restart timer
-    const MIC_RESTART_DELAY_MS = 700; // NEW: buffer after TTS ends before mic goes live again
+    let lastSpokenReply = "";     // last thing JARVIS said, for echo detection
+    let speakingCooldownUntil = 0; // timestamp (ms) until which incoming results are ignored
+    const MIC_COOLDOWN_MS = 700;   // buffer after TTS ends before results are trusted again
     let systemVoices = [];
 
     // NEW: crude similarity check — normalizes and compares word overlap.
@@ -516,19 +516,17 @@
       return cleaned.trim();
     }
 
-    // UPDATED: stops mic before speaking, resumes it only after TTS ends + a cooldown buffer
+    // UPDATED: no longer stops/starts recognition around TTS (that caused a race
+    // where start() could throw silently while the prior stop() was still completing).
+    // Instead, recognition just keeps running continuously and results are ignored
+    // while isSpeaking / within the cooldown window / matching the echo check.
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
       window.speechSynthesis.cancel();
 
-      // Stop listening BEFORE JARVIS starts talking, so it can't hear itself
       isSpeaking = true;
-      lastSpokenReply = text; // NEW: remember what we said, for echo detection
-      if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; } // NEW
-      if (recognition) {
-        try { recognition.stop(); } catch (e) {}
-      }
+      lastSpokenReply = text;
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
@@ -545,27 +543,15 @@
       utterance.onend = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
-
-        // NEW: wait a beat after TTS visually ends before treating the mic
-        // as safe again — hardware/speaker audio can ring for a moment.
-        restartTimer = setTimeout(() => {
-          isSpeaking = false;
-          if (isCallActive && isMicOn && recognition) {
-            try { recognition.start(); } catch (e) {}
-          }
-        }, MIC_RESTART_DELAY_MS);
+        isSpeaking = false;
+        speakingCooldownUntil = Date.now() + MIC_COOLDOWN_MS;
       };
 
       utterance.onerror = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
-
-        restartTimer = setTimeout(() => {
-          isSpeaking = false;
-          if (isCallActive && isMicOn && recognition) {
-            try { recognition.start(); } catch (e) {}
-          }
-        }, MIC_RESTART_DELAY_MS);
+        isSpeaking = false;
+        speakingCooldownUntil = Date.now() + MIC_COOLDOWN_MS;
       };
 
       window.speechSynthesis.speak(utterance);
@@ -660,14 +646,13 @@
         recognition.lang = 'en-US';
 
         recognition.onresult = async (event) => {
-          // UPDATED: also ignore results while JARVIS is speaking
-          if (!isCallActive || isProcessing || isSpeaking) return;
+          if (!isCallActive || isProcessing || isSpeaking || Date.now() < speakingCooldownUntil) return;
 
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
 
           if (transcript.length < 3) return;
 
-          // NEW: if this looks like JARVIS hearing its own last reply, ignore it
+          // if this looks like JARVIS hearing its own last reply, ignore it
           if (isLikelyEcho(transcript)) {
             console.log('Ignored likely echo:', transcript);
             return;
@@ -687,9 +672,10 @@
         };
 
         recognition.onend = () => {
-          // UPDATED: don't auto-restart while JARVIS is speaking;
-          // speakJARVIS's onend/onerror will restart it instead
-          if (isCallActive && isMicOn && !isSpeaking && recognition) {
+          // With continuous mode, this normally only fires on an unexpected
+          // stop (browser silence timeout, network hiccup) since we no longer
+          // call recognition.stop() ourselves during TTS playback.
+          if (isCallActive && isMicOn && recognition) {
             try { recognition.start(); } catch(e){}
           }
         };
@@ -722,7 +708,7 @@
       isCallActive = false;
       isProcessing = false;
       isSpeaking = false;
-      if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
+      speakingCooldownUntil = 0;
       lastSpokenReply = "";
       if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
