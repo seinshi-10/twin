@@ -596,17 +596,32 @@
     // UPGRADED SNAPSHOT RESOLUTION & QUALITY
 function captureCameraSnapshot() {
   const video = document.getElementById('userCamera');
-  if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
+  if (!video || video.readyState !== video.HAVE_ENOUGH_DATA || !video.videoWidth) return null;
 
   const canvas = document.createElement('canvas');
-  // High enough resolution for vision model to analyze posture and background clearly
-  canvas.width = 480;
-  canvas.height = 360;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.7);
-}
+  const maxDimension = 640;
+  let width = video.videoWidth;
+  let height = video.videoHeight;
 
+  // Scale relative to original aspect ratio
+  if (width > height) {
+    if (width > maxDimension) {
+      height = Math.round((height * maxDimension) / width);
+      width = maxDimension;
+    }
+  } else {
+    if (height > maxDimension) {
+      width = Math.round((width * maxDimension) / height);
+      height = maxDimension;
+    }
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
 // ALWAYS ATTACH CAMERA FRAME IN TACTICAL MODE
 function initSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
