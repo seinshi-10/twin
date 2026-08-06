@@ -428,6 +428,7 @@
     let isCamOn = true;
     let systemVoices = [];
     let speechSilenceTimeout = null;
+    let pendingWindow = null;
 
     function initSpeech() {
       if ('speechSynthesis' in window) {
@@ -450,47 +451,46 @@
       document.getElementById(screenId).classList.add('active');
     }
 
-    function openUniversalUrl(rawTarget) {
-      if (!rawTarget) return;
-      let target = rawTarget.trim().replace(/\/+$/, '');
-
-      if (target.startsWith('@')) {
-        window.open(`https://www.youtube.com/${target}`, '_blank');
-        return;
-      }
-
-      if (/^https?:\/\//i.test(target)) {
-        window.open(target, '_blank');
-        return;
-      }
-
-      if (!target.includes('.') && !target.includes(' ')) {
-        window.open(`https://www.${target}.com`, '_blank');
-        return;
-      }
-
-      window.open(`https://${target}`, '_blank');
-    }
-
     function processAndCleanReply(text) {
       let cleaned = text;
+      let targetUrl = null;
 
-      const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
-      if (videoIdMatch) {
-        window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
+      const playMatch = cleaned.match(/\[\[PLAY_VIDEO:\s*(.*?)\]\]/i);
+      if (playMatch) {
+        const query = playMatch[1].trim();
+        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       }
 
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
-      if (navMatch && !videoIdMatch) {
-        openUniversalUrl(navMatch[1].trim());
+      if (navMatch && !playMatch) {
+        let target = navMatch[1].trim();
+        if (!/^https?:\/\//i.test(target)) {
+          target = `https://${target}`;
+        }
+        targetUrl = target;
       }
+
+      if (targetUrl) {
+        if (pendingWindow && !pendingWindow.closed) {
+          pendingWindow.location.href = targetUrl;
+        } else {
+          window.open(targetUrl, '_blank');
+        }
+      } else if (pendingWindow && !pendingWindow.closed) {
+        pendingWindow.close();
+      }
+
+      pendingWindow = null;
 
       cleaned = cleaned.replace(/\[\[.*?\]\]/gi, '');
       cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
       cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
-      cleaned = cleaned.replace(/[\*\#\`\_]/g, '');
+      cleaned = cleaned.replace(/[\*\#\`\_]/g, '').trim();
 
-      return cleaned.trim();
+      return {
+        text: cleaned || "Processing your request, Sir.",
+        actionUrl: targetUrl
+      };
     }
 
     function speakJARVIS(text, coreElement) {
@@ -573,113 +573,65 @@
       input.value = '';
       appendChatMessage(text, 'user');
 
+      pendingWindow = window.open('about:blank', '_blank');
+
       const mainCore = document.getElementById('mainCore');
-      mainCore.classList.add('speaking');
+      if (mainCore) mainCore.classList.add('speaking');
 
       const rawReply = await requestAI(text);
       const cleanReply = processAndCleanReply(rawReply);
 
-      appendChatMessage(cleanReply, 'bot');
-      document.getElementById('mainSubtitle').textContent = `"${cleanReply}"`;
-      speakJARVIS(cleanReply, mainCore);
+      appendChatMessage(cleanReply.text, 'bot', cleanReply.actionUrl);
+      document.getElementById('mainSubtitle').textContent = `"${cleanReply.text}"`;
+      speakJARVIS(cleanReply.text, mainCore);
     }
 
-    function appendChatMessage(text, sender) {
+    function appendChatMessage(text, sender, actionUrl = null) {
       const feed = document.getElementById('chatFeed');
       const msg = document.createElement('div');
       msg.className = `msg ${sender}`;
       msg.textContent = text;
+
+      if (actionUrl) {
+        const btn = document.createElement('a');
+        btn.href = actionUrl;
+        btn.target = "_blank";
+        btn.textContent = "▶ Launch Link";
+        btn.style.cssText = "display: block; margin-top: 8px; color: var(--cyan); text-decoration: underline; font-weight: bold;";
+        msg.appendChild(btn);
+      }
+
       feed.appendChild(msg);
       feed.scrollTop = feed.scrollHeight;
     }
 
-    // UPGRADED SNAPSHOT RESOLUTION & QUALITY
-function captureCameraSnapshot() {
-  const video = document.getElementById('userCamera');
-  if (!video || video.readyState !== video.HAVE_ENOUGH_DATA || !video.videoWidth) return null;
+    function captureCameraSnapshot() {
+      const video = document.getElementById('userCamera');
+      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA || !video.videoWidth) return null;
 
-  const canvas = document.createElement('canvas');
-  const maxDimension = 640;
-  let width = video.videoWidth;
-  let height = video.videoHeight;
+      const canvas = document.createElement('canvas');
+      const maxDimension = 640;
+      let width = video.videoWidth;
+      let height = video.videoHeight;
 
-  // Scale relative to original aspect ratio
-  if (width > height) {
-    if (width > maxDimension) {
-      height = Math.round((height * maxDimension) / width);
-      width = maxDimension;
-    }
-  } else {
-    if (height > maxDimension) {
-      width = Math.round((width * maxDimension) / height);
-      height = maxDimension;
-    }
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, width, height);
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
-// ALWAYS ATTACH CAMERA FRAME IN TACTICAL MODE
-function initSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return;
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
-
-  recognition.onresult = (event) => {
-    if (!isCallActive || isProcessing) return;
-
-    let fullTranscript = '';
-    for (let i = 0; i < event.results.length; i++) {
-      fullTranscript += event.results[i][0].transcript + ' ';
-    }
-
-    const currentText = fullTranscript.trim();
-    if (currentText.length > 0) {
-      document.getElementById('callSubtitle').textContent = `USR: "${currentText}"`;
-    }
-
-    clearTimeout(speechSilenceTimeout);
-    speechSilenceTimeout = setTimeout(async () => {
-      if (!isCallActive || isProcessing) return;
-
-      if (currentText.length >= 2) {
-        isProcessing = true;
-        
-        try { recognition.abort(); } catch(e){}
-
-        const callCore = document.getElementById('callCore');
-        
-        // ALWAYS send snapshot when camera is active (removed visionKeywords filter)
-        const snapshot = (isCallActive && isCamOn) ? captureCameraSnapshot() : null;
-
-        const rawReply = await requestAI(currentText, snapshot);
-        const cleanReply = processAndCleanReply(rawReply);
-        
-        document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
-        speakJARVIS(cleanReply, callCore);
+      if (width > height) {
+        if (width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
       }
-    }, 1200);
-  };
 
-  recognition.onerror = (event) => {
-    if (event.error !== 'aborted') {
-      setTimeout(restartListening, 500);
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, width, height);
+      return canvas.toDataURL('image/jpeg', 0.85);
     }
-  };
-
-  recognition.onend = () => {
-    if (isCallActive && isMicOn && !isProcessing) {
-      setTimeout(restartListening, 300);
-    }
-  };
-}
 
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -713,15 +665,15 @@ function initSpeechRecognition() {
             try { recognition.abort(); } catch(e){}
 
             const callCore = document.getElementById('callCore');
-            const visionKeywords = ["see", "look", "view", "camera", "showing", "what is this", "describe", "who", "where"];
-            const needsVision = visionKeywords.some(kw => currentText.toLowerCase().includes(kw));
-            const snapshot = (needsVision && isCamOn) ? captureCameraSnapshot() : null;
+            const snapshot = (isCallActive && isCamOn) ? captureCameraSnapshot() : null;
+
+            pendingWindow = window.open('about:blank', '_blank');
 
             const rawReply = await requestAI(currentText, snapshot);
             const cleanReply = processAndCleanReply(rawReply);
             
-            document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
-            speakJARVIS(cleanReply, callCore);
+            document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply.text}"`;
+            speakJARVIS(cleanReply.text, callCore);
           }
         }, 1200);
       };
