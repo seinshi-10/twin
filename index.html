@@ -167,7 +167,7 @@
     .subtitle-box {
       margin-top: 25px;
       width: 100%;
-      min-height: 54px;
+      min-height: 60px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 16px;
@@ -429,7 +429,7 @@
     let systemVoices = [];
     let speechSilenceTimeout = null;
 
-    // TTS VOICE INITIALIZATION
+    // VOICE ENGINE INITIALIZATION
     function initSpeech() {
       if ('speechSynthesis' in window) {
         systemVoices = window.speechSynthesis.getVoices();
@@ -473,24 +473,26 @@
       window.open(`https://${target}`, '_blank');
     }
 
-    // ACTION TAG PARSER & CLEANER
     function processAndCleanReply(text) {
       let cleaned = text;
 
-      // 1. Open video in a NEW Chrome tab
+      // 1. Open video in a NEW tab
       const videoIdMatch = cleaned.match(/\[\[PLAY_VIDEO_ID:\s*([a-zA-Z0-9_-]{11})\]\]/i);
       if (videoIdMatch) {
         window.open(`https://www.youtube.com/watch?v=${videoIdMatch[1]}`, '_blank');
       }
 
-      // 2. Open standard web page or search query
+      // 2. Open URL
       const navMatch = cleaned.match(/\[\[NAVIGATE:\s*(.*?)\]\]/i);
       if (navMatch && !videoIdMatch) {
         openUniversalUrl(navMatch[1].trim());
       }
 
-      // 3. Clean ALL bracketed tags so no code ever leaks into the chat bubble
+      // 3. Clean tags and formatting
       cleaned = cleaned.replace(/\[\[.*?\]\]/gi, '');
+      cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
+      cleaned = cleaned.replace(/[\*\#\`\_]/g, '');
 
       return cleaned.trim();
     }
@@ -498,10 +500,17 @@
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
-      window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel(); // Clear previous speech queue
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const spokenText = text.replace(/JARVIS:/gi, '').replace(/[\*\#\`\_]/g, '').trim();
+      if (!spokenText) {
+        isProcessing = false;
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
       const voices = systemVoices.length ? systemVoices : window.speechSynthesis.getVoices();
+      
       const britishVoice = voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('George'))) 
                         || voices.find(v => v.lang === 'en-GB')
                         || voices.find(v => v.lang.includes('en'));
@@ -516,7 +525,6 @@
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
 
-        // Resume active listening after speaking finishes
         if (isCallActive && isMicOn && recognition) {
           try { recognition.start(); } catch(e){}
         }
@@ -525,6 +533,7 @@
       utterance.onend = finishSpeech;
       utterance.onerror = finishSpeech;
 
+      window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
     }
 
@@ -541,9 +550,6 @@
 
         const data = await response.json();
         let reply = data.reply || "At your service, Sir.";
-        
-        // Remove reasoning/think tags if present
-        reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
         chatHistory.push({ role: "assistant", content: reply });
         return reply;
@@ -583,16 +589,17 @@
       feed.scrollTop = feed.scrollHeight;
     }
 
+    // Ultra-lightweight snapshot (120x90 @ 0.2 quality) to avoid 429 TPM Rate Limits
     function captureCameraSnapshot() {
       const video = document.getElementById('userCamera');
       if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
 
       const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 120;
+      canvas.width = 120;
+      canvas.height = 90;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg', 0.35);
+      return canvas.toDataURL('image/jpeg', 0.2);
     }
 
     async function startCall() {
@@ -623,7 +630,6 @@
         recognition.onresult = (event) => {
           if (!isCallActive || isProcessing) return;
 
-          // Build full sentence from speech results without locking on the first word
           let fullTranscript = '';
           for (let i = 0; i < event.results.length; i++) {
             fullTranscript += event.results[i][0].transcript + ' ';
@@ -634,7 +640,6 @@
             document.getElementById('callSubtitle').textContent = `USR: "${currentText}"`;
           }
 
-          // Debounce: Wait 1.1s for silence before sending full sentence
           clearTimeout(speechSilenceTimeout);
           speechSilenceTimeout = setTimeout(async () => {
             if (!isCallActive || isProcessing) return;
@@ -642,11 +647,14 @@
             if (currentText.length >= 3) {
               isProcessing = true;
               
-              // Pause recognition while JARVIS speaks
               try { recognition.stop(); } catch(e){}
 
               const callCore = document.getElementById('callCore');
-              const snapshot = captureCameraSnapshot();
+
+              // Only send snapshot if vision intent is detected
+              const visionKeywords = ["see", "look", "view", "camera", "showing", "what is this", "describe", "who", "where"];
+              const needsVision = visionKeywords.some(kw => currentText.toLowerCase().includes(kw));
+              const snapshot = (needsVision && isCamOn) ? captureCameraSnapshot() : null;
 
               const rawReply = await requestAI(currentText, snapshot);
               const cleanReply = processAndCleanReply(rawReply);
@@ -654,11 +662,10 @@
               document.getElementById('callSubtitle').textContent = `JARVIS: "${cleanReply}"`;
               speakJARVIS(cleanReply, callCore);
             }
-          }, 1100);
+          }, 1000);
         };
 
         recognition.onend = () => {
-          // Restart recognition if call is active and not currently processing
           if (isCallActive && isMicOn && !isProcessing && recognition) {
             try { recognition.start(); } catch(e){}
           }
