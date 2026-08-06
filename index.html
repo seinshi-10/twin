@@ -429,7 +429,6 @@
     let systemVoices = [];
     let speechSilenceTimeout = null;
 
-    // VOICE ENGINE INITIALIZATION
     function initSpeech() {
       if ('speechSynthesis' in window) {
         systemVoices = window.speechSynthesis.getVoices();
@@ -535,7 +534,6 @@
       utterance.onend = finishSpeech;
       utterance.onerror = finishSpeech;
 
-      // Watchdog timer to unstick speech processing if audio fails
       const watchdogTime = Math.max(3000, spokenText.length * 120);
       setTimeout(finishSpeech, watchdogTime);
 
@@ -607,7 +605,6 @@
       return canvas.toDataURL('image/jpeg', 0.2);
     }
 
-    // SELF-HEALING SPEECH RECOGNITION INSTANCE
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
@@ -673,7 +670,6 @@
       try {
         recognition.start();
       } catch (e) {
-        // Recreate recognition instance if browser speech engine is locked
         try { recognition.abort(); } catch(err){}
         initSpeechRecognition();
         try { recognition.start(); } catch(err){}
