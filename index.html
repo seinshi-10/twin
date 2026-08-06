@@ -426,8 +426,29 @@
     let recognition = null;
     let isMicOn = true;
     let isCamOn = true;
-    let isSpeaking = false; // NEW: tracks whether JARVIS's TTS is currently playing
+    let isSpeaking = false; // tracks whether JARVIS's TTS is currently playing
+    let lastSpokenReply = "";  // NEW: last thing JARVIS said, for echo detection
+    let restartTimer = null;   // NEW: handle for the cooldown-before-restart timer
+    const MIC_RESTART_DELAY_MS = 700; // NEW: buffer after TTS ends before mic goes live again
     let systemVoices = [];
+
+    // NEW: crude similarity check — normalizes and compares word overlap.
+    // If the new transcript is basically what JARVIS just said, it's an echo, not a command.
+    function isLikelyEcho(transcript) {
+      if (!lastSpokenReply) return false;
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+      const a = norm(transcript);
+      const b = norm(lastSpokenReply);
+      if (!a) return false;
+      if (b.includes(a) || a.includes(b)) return true;
+
+      const wordsA = new Set(a.split(/\s+/).filter(Boolean));
+      const wordsB = new Set(b.split(/\s+/).filter(Boolean));
+      if (wordsA.size === 0) return false;
+      let overlap = 0;
+      wordsA.forEach(w => { if (wordsB.has(w)) overlap++; });
+      return (overlap / wordsA.size) > 0.6;
+    }
 
     // TTS VOICE INITIALIZATION
     function initSpeech() {
@@ -495,7 +516,7 @@
       return cleaned.trim();
     }
 
-    // UPDATED: stops mic before speaking, resumes it only after TTS ends
+    // UPDATED: stops mic before speaking, resumes it only after TTS ends + a cooldown buffer
     function speakJARVIS(text, coreElement) {
       if (!('speechSynthesis' in window)) return;
 
@@ -503,6 +524,8 @@
 
       // Stop listening BEFORE JARVIS starts talking, so it can't hear itself
       isSpeaking = true;
+      lastSpokenReply = text; // NEW: remember what we said, for echo detection
+      if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; } // NEW
       if (recognition) {
         try { recognition.stop(); } catch (e) {}
       }
@@ -522,22 +545,27 @@
       utterance.onend = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
-        isSpeaking = false;
 
-        // Resume listening ONLY after JARVIS has finished talking
-        if (isCallActive && isMicOn && recognition) {
-          try { recognition.start(); } catch (e) {}
-        }
+        // NEW: wait a beat after TTS visually ends before treating the mic
+        // as safe again — hardware/speaker audio can ring for a moment.
+        restartTimer = setTimeout(() => {
+          isSpeaking = false;
+          if (isCallActive && isMicOn && recognition) {
+            try { recognition.start(); } catch (e) {}
+          }
+        }, MIC_RESTART_DELAY_MS);
       };
 
       utterance.onerror = () => {
         if (coreElement) coreElement.classList.remove('speaking');
         isProcessing = false;
-        isSpeaking = false;
 
-        if (isCallActive && isMicOn && recognition) {
-          try { recognition.start(); } catch (e) {}
-        }
+        restartTimer = setTimeout(() => {
+          isSpeaking = false;
+          if (isCallActive && isMicOn && recognition) {
+            try { recognition.start(); } catch (e) {}
+          }
+        }, MIC_RESTART_DELAY_MS);
       };
 
       window.speechSynthesis.speak(utterance);
@@ -639,6 +667,12 @@
 
           if (transcript.length < 3) return;
 
+          // NEW: if this looks like JARVIS hearing its own last reply, ignore it
+          if (isLikelyEcho(transcript)) {
+            console.log('Ignored likely echo:', transcript);
+            return;
+          }
+
           isProcessing = true;
           document.getElementById('callSubtitle').textContent = `USR: "${transcript}"`;
 
@@ -688,6 +722,8 @@
       isCallActive = false;
       isProcessing = false;
       isSpeaking = false;
+      if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
+      lastSpokenReply = "";
       if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       if (mediaStream) {
